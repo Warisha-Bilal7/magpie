@@ -1,0 +1,17 @@
+[
+  {
+    "title": "Ship the context pack",
+    "note": "Generate a compact markdown brief for a project to paste into any chat.",
+    "body": "We should assemble recent approved journal lines, decisions, open questions and linked ideas into a paste-ready markdown brief."
+  },
+  {
+    "title": "Job tailoring",
+    "note": "Match JD to journal evidence with citation checks.",
+    "body": "Tailor resume bullets and a cover letter grounded in cited journal entries; drop unsupported claims with warnings."
+  },
+  {
+    "title": "Idea duplicate detection",
+    "note": "Flag near-duplicates with a tunable threshold.",
+    "body": "Use embeddings with a keyword fallback so the detector works offline and is deterministic in tests."
+  }
+]

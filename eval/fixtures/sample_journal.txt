@@ -1,0 +1,11 @@
+```text
+Fixed the FTS bug in capture search (trigger sync).
+Reviewed 3 PRs from the team and merged the UI polish.
+Should we switch the embedding dimension to 1024?
+```
+---
+```text
+Decided to use SQLite for the local cache.
+Tuned the query planner for the new index.
+Next step: run the benchmarks?
+```

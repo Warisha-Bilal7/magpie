@@ -1,0 +1,8 @@
+# Eval fixtures and results
+models:
+  - name: qwen2.5:3b
+    category: 3b
+  - name: template
+    category: baseline
+results:
+  path: eval/results.csv

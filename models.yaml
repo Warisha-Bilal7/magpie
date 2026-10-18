@@ -1,0 +1,11 @@
+models:
+  - name: qwen2.5:3b
+    notes: "small, fast, runs well on most machines"
+  - name: llama3.2:1b
+    notes: "very small, template baseline candidate (1B)"
+  - name: llama3.2:3b
+    notes: "3B alternative"
+  - name: qwen2.5:7b
+    notes: "7B if RAM allows"
+  - name: template
+    notes: "deterministic template fallback (no model)"
