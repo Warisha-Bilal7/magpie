@@ -1,0 +1,14 @@
+Write a cover letter for the {role} role at {company}.
+Ground every claim in the EVIDENCE below — journal lines you already wrote and verified.
+Do not add dates, times, numbers, links or names that are not in the JOB DESCRIPTION
+or the EVIDENCE. No filler, no praise, no buzzwords. Keep it under 400 words.
+{feedback}
+
+JOB DESCRIPTION:
+{jd_text}
+
+REQUIREMENTS:
+{requirements}
+
+EVIDENCE (verified journal lines):
+{evidence}

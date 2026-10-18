@@ -107,8 +107,10 @@ def test_journal_day_with_captures(db, monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("model off")
     monkeypatch.setattr("cdesk.graphs.journal.chat", boom)
+    from datetime import datetime, timezone
+    day = datetime.now(timezone.utc).date().isoformat()  # capture is stored in UTC
     runner.invoke(app, ["add", "-t", "Shipped the capture inbox", "-o", "opencode"])
-    r = runner.invoke(app, ["journal", "--day", __import__("datetime").date.today().isoformat()])
+    r = runner.invoke(app, ["journal", "--day", day])
     assert r.exit_code == 0
     assert "digest fallback" in r.output
     assert "capture inbox" in r.output
@@ -124,8 +126,8 @@ def test_journal_weekly_from_daily_lines(db, monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("model off")
     monkeypatch.setattr("cdesk.graphs.journal.chat", boom)
-    import datetime
-    today = datetime.date.today().isoformat()
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).date().isoformat()  # capture is stored in UTC
     runner.invoke(app, ["add", "-t", "Shipped the capture inbox", "-o", "opencode"])
     runner.invoke(app, ["journal", "--day", today])
     r = runner.invoke(app, ["journal", "--day", today, "--weekly"])

@@ -110,7 +110,9 @@ def test_duplicates_for_threshold_boundary():
     hits = duplicates_for(a, rows, threshold=0.85)
     assert [h["id"] for h in hits] == [1, 2]
     assert hits[0]["score"] > hits[1]["score"] >= 0.85
-    assert duplicates_for(a, rows, threshold=0.99) == []
+    # raise the threshold: only the exact vector (1.0) still matches
+    strict = duplicates_for(a, rows, threshold=0.99)
+    assert [h["id"] for h in strict] == [1]
 
 
 def test_duplicates_for_skips_unembedded_rows():
@@ -122,7 +124,7 @@ def test_duplicates_for_skips_unembedded_rows():
 def test_find_duplicates_end_to_end_with_fake_embedder(conn):
     v = {
         "idea one\nnote one": [1.0, 0.0, 0.0],
-        "idea two\n": [0.0, 1.0, 0.0],
+        "idea two": [0.0, 1.0, 0.0],
         "idea one again\nnote one": [0.98, 0.199, 0.0],
     }
     embedder = FakeEmbedder(v)
