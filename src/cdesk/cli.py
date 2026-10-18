@@ -376,14 +376,96 @@ def repurpose(
 
 @app.command()
 def nudge() -> None:
-    """Show posting nudges (M5)."""
-    typer.echo("Nudges land in M5.")
+    """Show posting nudges and drafts waiting for review."""
+    from .planner import drafts_ready, due_nudges, last_published_dates, nudge_text
+    from .workspaces import list_workspaces
+
+    conn = _open_db()
+    try:
+        workspaces = list_workspaces(conn)
+        nudges = due_nudges(workspaces, last_published_dates(conn), date.today())
+        drafts = drafts_ready([
+            dict(r) for r in conn.execute(
+                "SELECT id, workspace_id, status FROM post WHERE status = 'draft'"
+            ).fetchall()
+        ])
+    finally:
+        conn.close()
+    if not nudges and not drafts:
+        typer.echo("All channels on cadence. Nothing waiting either.")
+        return
+    for n in nudges:
+        typer.echo(f"- {nudge_text(n)}")
+    if drafts:
+        typer.echo(f"Drafts ready for review: {len(drafts)} "
+                   f"(ids: {', '.join(str(p['id']) for p in drafts)})")
 
 
 @app.command()
-def ics() -> None:
-    """Export planner events as .ics (M5)."""
-    typer.echo(".ics export lands in M5.")
+def ics(
+    out: str = typer.Option("", "--out", "-o", help="Write the .ics here (default: data/exports/)."),
+) -> None:
+    """Export scheduled posts as an .ics calendar file."""
+    from pathlib import Path
+
+    from .config import EXPORT_DIR
+    from .db import list_posts
+    from .planner import scheduled_events, to_ics
+
+    conn = _open_db()
+    try:
+        posts = list_posts(conn, status="scheduled")
+    finally:
+        conn.close()
+    events = scheduled_events(posts)
+    text = to_ics(events)
+    path = Path(out) if out else EXPORT_DIR / "content-desk.ics"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8", newline="")
+    typer.echo(f"Wrote {len(events)} event(s) to {path}")
+
+
+@app.command()
+def schedule(
+    post_id: int = typer.Argument(...),
+    at: str = typer.Option(..., "--at", help="ISO time, e.g. 2026-10-20T09:00:00+00:00"),
+) -> None:
+    """Approve-and-schedule a draft (must already be approved)."""
+    from .planner import set_post_status
+
+    conn = _open_db()
+    try:
+        try:
+            row = set_post_status(conn, post_id, "scheduled", scheduled_at=at)
+        except ValueError as e:
+            typer.echo(str(e))
+            raise typer.Exit(code=1)
+    finally:
+        conn.close()
+    typer.echo(f"Post #{row['id']} scheduled for {row['scheduled_at']}")
+
+
+@app.command()
+def status(
+    post_id: int = typer.Argument(...),
+    new_status: str = typer.Argument(..., help="idea|draft|approved|scheduled|published"),
+    at: str = typer.Option("", "--at", help="ISO time (scheduled/published)."),
+) -> None:
+    """Move a post through its status flow (validated transitions)."""
+    from .planner import set_post_status
+
+    conn = _open_db()
+    try:
+        try:
+            row = set_post_status(conn, post_id, new_status,
+                                  scheduled_at=at or None,
+                                  published_at=at or None)
+        except ValueError as e:
+            typer.echo(str(e))
+            raise typer.Exit(code=1)
+    finally:
+        conn.close()
+    typer.echo(f"Post #{row['id']} is now '{row['status']}'")
 
 
 @app.command()

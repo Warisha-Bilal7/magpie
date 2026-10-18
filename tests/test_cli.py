@@ -172,10 +172,54 @@ def test_drafts_list_and_repurpose(db, monkeypatch):
     assert r5.exit_code == 1
 
 
-def test_stubs_for_future_milestones(db):
+def test_nudge_and_ics_are_real(db):
     for cmd in (["nudge"], ["ics"]):
         result = runner.invoke(app, cmd)
         assert result.exit_code == 0
+
+
+def test_nudge_shows_never_posted_workspace(db):
+    runner.invoke(app, ["workspace", "add", "LI", "-k", "linkedin", "--cadence", "3"])
+    r = runner.invoke(app, ["nudge"])
+    assert r.exit_code == 0
+    assert "No LI post yet" in r.output
+
+
+def test_schedule_flow(db, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("model off")
+    monkeypatch.setattr("cdesk.graphs.draft.chat", boom)
+    runner.invoke(app, ["workspace", "add", "LI", "-k", "linkedin"])
+    runner.invoke(app, ["draft", "--brief", "shipped v2", "--workspace", "LI"])
+    # draft -> scheduled is rejected; approve first
+    r0 = runner.invoke(app, ["schedule", "1", "--at", "2026-10-20T09:00:00+00:00"])
+    assert r0.exit_code == 1
+    r1 = runner.invoke(app, ["status", "1", "approved"])
+    assert "approved" in r1.output
+    r2 = runner.invoke(app, ["schedule", "1", "--at", "2026-10-20T09:00:00+00:00"])
+    assert r2.exit_code == 0
+    assert "2026-10-20" in r2.output
+    r3 = runner.invoke(app, ["status", "1", "published", "--at", "2026-10-20T09:05:00+00:00"])
+    assert "published" in r3.output
+    r4 = runner.invoke(app, ["status", "1", "draft"])
+    assert r4.exit_code == 1  # published is terminal
+
+
+def test_ics_exports_scheduled_posts(db, monkeypatch, tmp_path):
+    def boom(*a, **k):
+        raise RuntimeError("model off")
+    monkeypatch.setattr("cdesk.graphs.draft.chat", boom)
+    runner.invoke(app, ["workspace", "add", "LI", "-k", "linkedin"])
+    runner.invoke(app, ["draft", "--brief", "hello there", "--workspace", "LI"])
+    runner.invoke(app, ["status", "1", "approved"])
+    runner.invoke(app, ["schedule", "1", "--at", "2026-10-20T09:00:00+00:00"])
+    out = tmp_path / "cal.ics"
+    r = runner.invoke(app, ["ics", "--out", str(out)])
+    assert r.exit_code == 0
+    assert "1 event(s)" in r.output
+    text = out.read_text(encoding="utf-8")
+    assert "BEGIN:VCALENDAR" in text
+    assert "DTSTART:20261020T090000Z" in text
 
 
 def test_workspace_add_and_list(db):

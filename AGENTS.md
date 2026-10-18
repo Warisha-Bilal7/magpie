@@ -38,14 +38,22 @@ Source of truth: docs/PLAN.md. Build one milestone per session, on its own branc
 - Voice examples on Workspaces Streamlit page + `cdesk workspace voice` (#21)
 - Banned-phrase editor (page + `cdesk workspace ban/unban`, #22)
 
-## Current milestone: M4 Draft graph
-- [x] extract_facts / check_facts / check_rules planted-error tests (#25, #26)
-- [x] gather from journal lines, post, idea or brief (#23)
-- [x] write with prompts/draft.txt + exact violation feedback (#24)
-- [x] Router, MAX_ATTEMPTS, save with leftover warnings (#27)
-- [x] Template fallback, works with Ollama off (#28)
-- [x] Repurpose across workspaces (`repurpose_post`, `cdesk repurpose`, #29)
-- [x] Drafts Streamlit page with warnings in red (#30)
+### M4 Draft graph
+- extract_facts / check_facts / check_rules planted-error tests (#25, #26)
+- gather from journal lines, post, idea or brief (#23)
+- write with prompts/draft.txt + exact violation feedback (#24)
+- Router, MAX_ATTEMPTS, save with leftover warnings (#27)
+- Template fallback, works with Ollama off (#28)
+- Repurpose across workspaces (`repurpose_post`, `cdesk repurpose`, #29)
+- Drafts Streamlit page with warnings in red (#30)
+
+## Current milestone: M5 Planner and nudges
+- [x] Post scheduling and status flow (`set_post_status`, validated transitions, #31)
+- [x] due_nudges with tests (never posted, on time, overdue, exact gap; #32)
+- [x] Reminders table helpers + Planner page weekly-review tab (#33)
+- [x] Week and month planner view (5_Planner.py; #34)
+- [x] to_ics export (`cdesk ics`, escaping + duration tested; #35)
+- [x] Nudge text template + drafts-ready suggestion (`cdesk nudge`; #36)
 
 ## Notes for later milestones
 - Schema is at v2 (FTS sync triggers). Bump MIGRATIONS in db.py for any table change;
