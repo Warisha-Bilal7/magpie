@@ -1,0 +1,5 @@
+timestamp,task,model,pass,notes
+2026-10-19T01:24:52.600675,verify.unsupported_reasons_planted_number,deterministic,True,caught invented number
+2026-10-19T01:24:52.600675,verify.check_facts_planted_date,deterministic,True,flagged mismatched date
+2026-10-19T01:24:52.600675,template.baseline_available,template,True,deterministic fallback exists
+2026-10-19T01:24:52.600675,db.smoke,deterministic,True,schema loads
