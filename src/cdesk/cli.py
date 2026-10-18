@@ -152,7 +152,7 @@ def inbox(
     origin: str | None = typer.Option(None, "--origin", "-o", help="Filter by origin."),
 ) -> None:
     """List recent captures (titles only — bodies are never printed)."""
-    from .db import list_captures, list_origins
+    from .db import list_captures
 
     conn = _open_db()
     try:
@@ -166,7 +166,6 @@ def inbox(
         return
     for row in rows:
         typer.echo(_fmt_capture(row))
-    known = list_origins(conn) if False else None  # origins listed via `cdesk origins`
 
 
 @app.command()
