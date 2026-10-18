@@ -81,10 +81,12 @@ def _prompt_captures(trimmed: list[dict]) -> str:
     )
 
 
-def _prompt_source_lines(source_lines: list[dict]) -> str:
-    return "\n".join(
+def _prompt_source_lines(source_lines: list[dict], captures: list[dict]) -> str:
+    allowed = sorted({c["id"] for c in captures})
+    lines = "\n".join(
         f"[{l['day']}] (captures {l['capture_ids']}) {l['text']}" for l in source_lines
     )
+    return lines + f"\n\nOnly cite capture ids from this list: {allowed}."
 
 
 def _feedback(state: JournalState) -> str:
@@ -121,7 +123,7 @@ def summarize(state: JournalState) -> dict:
     model = state.get("model_name") or MODEL_NAME
     source_lines = state.get("source_lines")
     if source_lines is not None:
-        material = _prompt_source_lines(source_lines)
+        material = _prompt_source_lines(source_lines, state.get("captures", []))
         kind_note = "summarize these daily journal lines into a weekly digest"
     else:
         material = _prompt_captures(state.get("trimmed", []))
