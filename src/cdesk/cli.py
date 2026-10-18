@@ -24,7 +24,11 @@ if hasattr(sys.stdout, "reconfigure"):
 
 app = typer.Typer(help="Content Desk — local-first work journal and posting desk.", no_args_is_help=True)
 ws_app = typer.Typer(help="Workspaces: channels, rules and the past-post voice corpus.", no_args_is_help=True)
+idea_app = typer.Typer(help="Idea cards: status, effort/impact scores, near-duplicate detection.", no_args_is_help=True)
+job_app = typer.Typer(help="Job tracker: kanban, deadlines, follow-up reminders, tailoring.", no_args_is_help=True)
 app.add_typer(ws_app, name="workspace")
+app.add_typer(idea_app, name="idea")
+app.add_typer(job_app, name="job")
 
 
 @app.callback()
@@ -91,19 +95,24 @@ def add(
     title: str | None = typer.Option(None, "--title", help="Optional title."),
     origin: str | None = typer.Option(None, "--origin", "-o", help='e.g. "claude-acct-2", "gemini".'),
     tags: str | None = typer.Option(None, "--tags", help="Comma-free tag string."),
+    project: str | None = typer.Option(None, "--project", "-p", help="Assign to a project (created on first mention)."),
 ) -> None:
     """Add a capture to the inbox: text, stdin, or a file. Deduped by content hash."""
     from .capture.files import capture_file
     from .capture.paste import add_capture
+    from .db import get_or_create_project
 
     conn = _open_db()
     try:
+        project_id = None
+        if project:
+            project_id = get_or_create_project(conn, project)["id"]
         if file:
             rid, created = capture_file(conn, file, origin=origin)
         else:
             body = text if text is not None else sys.stdin.read()
             rid, created = add_capture(conn, body, source="paste", origin=origin,
-                                       title=title, tags=tags)
+                                       title=title, tags=tags, project_id=project_id)
         if created:
             typer.echo(f"Captured #{rid} from origin={origin or default_origin()}.")
         else:
@@ -469,11 +478,75 @@ def status(
 
 
 @app.command()
+def tailor(
+    job_id: int = typer.Argument(..., help="Job id to tailor bullets for."),
+) -> None:
+    """Run the job tailor graph: match journal evidence, draft cited bullets."""
+    from .graphs.job_tailor import build_job_tailor_graph
+    from .jobs import get_job
+
+    conn = _open_db()
+    try:
+        job = get_job(conn, job_id)
+        if job is None:
+            typer.echo(f"No job #{job_id}.")
+            raise typer.Exit(code=1)
+        result = build_job_tailor_graph().invoke({
+            "conn": conn, "job_id": job_id, "jd_text": job.get("jd_text") or "",
+            "company": job["company"], "role": job["role"],
+        })
+    finally:
+        conn.close()
+    tag = " (template fallback)" if result.get("used_fallback") else ""
+    typer.echo(f"Tailored bullets for {job['company']} — {job['role']}{tag}")
+    for b in result.get("bullets", []):
+        typer.echo(f"  - {b['text']}  [cites: {b['cites']}]")
+    if not result.get("bullets"):
+        typer.echo("  (no bullets — no grounded evidence matched, or all were dropped)")
+    for w in result.get("warnings", []):
+        typer.echo(f"  warning: {w}")
+
+
+@app.command()
+def cover(
+    job_id: int = typer.Argument(..., help="Job id to draft a cover letter for."),
+) -> None:
+    """Draft a cover letter grounded in cited journal lines, fact-checked."""
+    from .graphs.job_tailor import draft_cover_letter
+    from .jobs import get_job
+
+    conn = _open_db()
+    try:
+        if get_job(conn, job_id) is None:
+            typer.echo(f"No job #{job_id}.")
+            raise typer.Exit(code=1)
+        result = draft_cover_letter(conn, job_id)
+    except ValueError as e:
+        typer.echo(str(e))
+        raise typer.Exit(code=1)
+    finally:
+        conn.close()
+    tag = " (template fallback)" if result.get("used_fallback") else ""
+    typer.echo(f"Cover letter (artifact #{result.get('artifact_id', 0)}){tag}")
+    typer.echo(result.get("letter", "(no letter)"))
+    for w in result.get("warnings", []):
+        typer.echo(f"  warning: {w}")
+
+
+@app.command()
 def context(
     project: str = typer.Argument(..., help="Project name for the brief."),
+    days: int = typer.Option(14, "--days", "-d", help="Look-back window in days."),
 ) -> None:
-    """Generate a paste-ready context pack for a project (M6)."""
-    typer.echo(f"Context pack for '{project}' lands in M6.")
+    """Generate a paste-ready context pack for a project (F8, issue #42)."""
+    from .context_pack import context_pack
+
+    conn = _open_db()
+    try:
+        md = context_pack(conn, project, days=days)
+    finally:
+        conn.close()
+    typer.echo(md, nl=False)
 
 
 # --- workspace subcommands (M3) ---------------------------------------------
@@ -615,6 +688,230 @@ def ws_voice(
     for i, ex in enumerate(examples, 1):
         preview = ex["body"].replace("\n", " ")[:100]
         typer.echo(f"{i}. #{ex['id']} {preview}")
+
+
+# --- idea subcommands (M6, issues #37, #38) ----------------------------------
+
+def _fmt_idea(row) -> str:
+    effort = f"e{row['effort']}" if row.get("effort") else "e?"
+    impact = f"i{row['impact']}" if row.get("impact") else "i?"
+    step = f"  next: {row['next_step']}" if row.get("next_step") else ""
+    return f"#{row['id']:>3} [{row['status']}] {effort}/{impact}  {row['title']}{step}"
+
+
+@idea_app.command("add")
+def idea_add(
+    title: str = typer.Argument(...),
+    note: str = typer.Option("", "--note", "-n"),
+    status: str = typer.Option("spark", "--status", "-s", help="spark|researching|building|shipped|parked"),
+    effort: int | None = typer.Option(None, "--effort", "-e", help="1-5."),
+    impact: int | None = typer.Option(None, "--impact", "-i", help="1-5."),
+    next_step: str = typer.Option("", "--next", help="One concrete next action."),
+    source: list[int] = typer.Option([], "--source", help="Capture id to link (repeatable)."),
+) -> None:
+    """Create an idea card."""
+    from .ideas import create_idea
+
+    conn = _open_db()
+    try:
+        try:
+            idea = create_idea(conn, title, note=note or None, status=status,
+                               effort=effort, impact=impact,
+                               next_step=next_step or None,
+                               source_ids=source or None)
+        except ValueError as e:
+            typer.echo(str(e))
+            raise typer.Exit(code=1)
+    finally:
+        conn.close()
+    typer.echo(_fmt_idea(idea))
+
+
+@idea_app.command("list")
+def idea_list(
+    status: str = typer.Option("", "--status", "-s", help="Filter by status."),
+) -> None:
+    """List idea cards (newest updated first)."""
+    from .ideas import list_ideas
+
+    conn = _open_db()
+    try:
+        rows = list_ideas(conn, status=status or None)
+    finally:
+        conn.close()
+    if not rows:
+        typer.echo("No ideas yet. Add one with `cdesk idea add`.")
+        return
+    for row in rows:
+        typer.echo(_fmt_idea(row))
+
+
+@idea_app.command("status")
+def idea_status(
+    idea_id: int = typer.Argument(...),
+    new_status: str = typer.Argument(..., help="spark|researching|building|shipped|parked"),
+) -> None:
+    """Move an idea to a new status."""
+    from .ideas import STATUSES, update_idea
+
+    conn = _open_db()
+    try:
+        if new_status not in STATUSES:
+            typer.echo(f"status must be one of {STATUSES}")
+            raise typer.Exit(code=1)
+        try:
+            idea = update_idea(conn, idea_id, status=new_status)
+        except ValueError as e:
+            typer.echo(str(e))
+            raise typer.Exit(code=1)
+    finally:
+        conn.close()
+    typer.echo(f"Idea #{idea['id']} -> '{idea['status']}'")
+
+
+@idea_app.command("dupes")
+def idea_dupes(
+    idea_id: int = typer.Argument(..., help="Idea to check for near-duplicates."),
+    threshold: float = typer.Option(0.82, "--threshold", "-t", help="Cosine similarity threshold 0-1."),
+) -> None:
+    """Find near-duplicate ideas (embedding cosine, keyword fallback offline)."""
+    from .ideas import find_duplicates, get_idea
+
+    conn = _open_db()
+    try:
+        idea = get_idea(conn, idea_id)
+        if idea is None:
+            typer.echo(f"No idea #{idea_id}.")
+            raise typer.Exit(code=1)
+        try:
+            dups = find_duplicates(conn, idea["title"], idea.get("note"),
+                                   threshold=threshold, exclude_id=idea_id)
+        except Exception as e:
+            typer.echo(f"duplicate check failed (Ollama unavailable?): {e}")
+            raise typer.Exit(code=1)
+    finally:
+        conn.close()
+    if not dups:
+        typer.echo(f"No near-duplicates at threshold {threshold}.")
+        return
+    for d in dups:
+        typer.echo(f"#{d['id']}  score={d['score']:.3f}  {d['title']}")
+
+
+# --- job subcommands (M6, issues #39, #40, #41) ------------------------------
+
+def _fmt_job(row) -> str:
+    deadline = f"  due {row['deadline']}" if row.get("deadline") else ""
+    applied = f"  applied {row['applied_on']}" if row.get("applied_on") else ""
+    return f"#{row['id']:>3} [{row['status']}] {row['company']} — {row['role']}{deadline}{applied}"
+
+
+@job_app.command("add")
+def job_add(
+    company: str = typer.Argument(...),
+    role: str = typer.Argument(...),
+    url: str = typer.Option("", "--url"),
+    deadline: str = typer.Option("", "--deadline", help="yyyy-mm-dd."),
+    jd_file: str = typer.Option("", "--jd", help="Path to a job-description text file."),
+) -> None:
+    """Add a job card."""
+    from pathlib import Path
+
+    from .jobs import add_job
+
+    jd_text = ""
+    if jd_file:
+        jd_text = Path(jd_file).read_text(encoding="utf-8", errors="replace")
+    conn = _open_db()
+    try:
+        job = add_job(conn, company, role, url=url or None,
+                      deadline=deadline or None, jd_text=jd_text or None)
+    finally:
+        conn.close()
+    typer.echo(_fmt_job(job))
+
+
+@job_app.command("list")
+def job_list(
+    status: str = typer.Option("", "--status", "-s", help="Filter by status."),
+) -> None:
+    """List job cards."""
+    from .jobs import list_jobs
+
+    conn = _open_db()
+    try:
+        rows = list_jobs(conn, status=status or None)
+    finally:
+        conn.close()
+    if not rows:
+        typer.echo("No jobs yet. Add one with `cdesk job add`.")
+        return
+    for row in rows:
+        typer.echo(_fmt_job(row))
+
+
+@job_app.command("status")
+def job_status(
+    job_id: int = typer.Argument(...),
+    new_status: str = typer.Argument(..., help="saved|applied|interviewing|offer|closed"),
+) -> None:
+    """Move a job through its kanban (validated transitions)."""
+    from .jobs import set_job_status
+
+    conn = _open_db()
+    try:
+        try:
+            job = set_job_status(conn, job_id, new_status)
+        except ValueError as e:
+            typer.echo(str(e))
+            raise typer.Exit(code=1)
+    finally:
+        conn.close()
+    typer.echo(f"Job #{job['id']} -> '{job['status']}'")
+
+
+@job_app.command("board")
+def job_board() -> None:
+    """Show the kanban: jobs grouped by status, deadlines first."""
+    from .jobs import kanban
+
+    conn = _open_db()
+    try:
+        board = kanban(conn)
+    finally:
+        conn.close()
+    if not any(board.values()):
+        typer.echo("Board is empty.")
+        return
+    for status, jobs in board.items():
+        typer.echo(f"{status.upper()} ({len(jobs)})")
+        for j in jobs:
+            typer.echo(f"  {_fmt_job(j)}")
+
+
+@job_app.command("followup")
+def job_followup(
+    job_id: int = typer.Argument(...),
+    days: int = typer.Option(7, "--days", "-d", help="Remind in N days."),
+    note: str = typer.Option("", "--note"),
+) -> None:
+    """Set a follow-up reminder for an application."""
+    from datetime import datetime, timedelta, timezone
+
+    from .jobs import add_followup_reminder, get_job
+
+    conn = _open_db()
+    try:
+        job = get_job(conn, job_id)
+        if job is None:
+            typer.echo(f"No job #{job_id}.")
+            raise typer.Exit(code=1)
+        due = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
+        title = note or f"Follow up: {job['company']} — {job['role']}"
+        rem_id = add_followup_reminder(conn, job_id, due, title)
+    finally:
+        conn.close()
+    typer.echo(f"Reminder #{rem_id} set for {due}: {title}")
 
 
 if __name__ == "__main__":

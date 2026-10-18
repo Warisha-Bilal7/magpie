@@ -266,3 +266,149 @@ def test_workspace_unknown_name(db):
     r = runner.invoke(app, ["workspace", "ban", "x", "-w", "Missing"])
     assert r.exit_code == 1
     assert "No workspace named" in r.output
+
+
+# --- M6 CLI: idea (#37, #38) --------------------------------------------------
+
+def test_idea_add_and_list(db):
+    r = runner.invoke(app, ["idea", "add", "Ship context packs", "--effort", "2", "--impact", "5"])
+    assert r.exit_code == 0
+    assert "Ship context packs" in r.output
+    r2 = runner.invoke(app, ["idea", "list"])
+    assert "Ship context packs" in r2.output
+    assert "e2/i5" in r2.output
+
+
+def test_idea_status_transition(db):
+    runner.invoke(app, ["idea", "add", "Test idea"])
+    r = runner.invoke(app, ["idea", "status", "1", "building"])
+    assert r.exit_code == 0
+    assert "'building'" in r.output
+    r2 = runner.invoke(app, ["idea", "status", "1", "bogus"])
+    assert r2.exit_code == 1
+
+
+def test_idea_dupes_offline_reports_failure(db, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("model off")
+    monkeypatch.setattr("cdesk.ideas.find_duplicates", boom)
+    runner.invoke(app, ["idea", "add", "First idea"])
+    r = runner.invoke(app, ["idea", "dupes", "1"])
+    assert r.exit_code == 1  # graceful failure when embeddings are unavailable
+    assert "duplicate check failed" in r.output
+
+
+# --- M6 CLI: job (#39) ---------------------------------------------------------
+
+def test_job_add_list_status(db):
+    r = runner.invoke(app, ["job", "add", "Acme", "Backend Engineer"])
+    assert r.exit_code == 0
+    assert "Acme" in r.output
+    r2 = runner.invoke(app, ["job", "list"])
+    assert "Acme" in r2.output
+    r3 = runner.invoke(app, ["job", "status", "1", "applied"])
+    assert "'applied'" in r3.output
+    r4 = runner.invoke(app, ["job", "status", "1", "bogus"])
+    assert r4.exit_code == 1
+
+
+def test_job_board_groups_by_status(db):
+    runner.invoke(app, ["job", "add", "Acme", "BE"])
+    runner.invoke(app, ["job", "add", "Beta", "FE"])
+    runner.invoke(app, ["job", "status", "2", "applied"])
+    r = runner.invoke(app, ["job", "board"])
+    assert r.exit_code == 0
+    assert "SAVED" in r.output
+    assert "APPLIED" in r.output
+
+
+def test_job_followup_sets_reminder(db):
+    runner.invoke(app, ["job", "add", "Acme", "BE"])
+    r = runner.invoke(app, ["job", "followup", "1", "--days", "3"])
+    assert r.exit_code == 0
+    assert "Reminder #1 set" in r.output
+
+
+# --- M6 CLI: tailor / cover (#40, #41) ------------------------------------------
+
+def test_tailor_requires_existing_job(db):
+    r = runner.invoke(app, ["tailor", "999"])
+    assert r.exit_code == 1
+    assert "No job #999" in r.output
+
+
+def test_cover_requires_existing_job(db):
+    r = runner.invoke(app, ["cover", "999"])
+    assert r.exit_code == 1
+    assert "No job #999" in r.output
+
+
+def test_tailor_runs_end_to_end(db, monkeypatch, tmp_path):
+    from cdesk.graphs.job_tailor import Bullet, Bullets, Requirement, Requirements
+
+    def fake_chat(messages, model, schema=None, temperature=0.0):
+        if isinstance(schema, type) and schema is Requirements:
+            return Requirements(requirements=[Requirement(text="Python")])
+        return Bullets(bullets=[Bullet(text="Shipped Python work.", cites=[1])])
+    monkeypatch.setattr("cdesk.graphs.job_tailor.chat", fake_chat)
+    monkeypatch.setattr("cdesk.graphs.job_tailor.embed_texts",
+                        lambda texts: [[1.0] + [0.0] * 767 for _ in texts])
+
+    from cdesk.capture.paste import add_capture
+    from cdesk.db import init_db, store_journal_entry
+    conn = init_db()
+    cid, _ = add_capture(conn, "Shipped Python work")
+    entry_id = store_journal_entry(conn, "2026-10-18", "daily",
+                                   [{"text": "Shipped Python work", "cites": [cid]}])
+    conn.execute("UPDATE journal_entry SET status='approved' WHERE id=?", (entry_id,))
+    conn.commit()
+    conn.close()
+
+    jd = tmp_path / "jd.txt"
+    jd.write_text("Python backend role", encoding="utf-8")
+    runner.invoke(app, ["job", "add", "Acme", "BE", "--jd", str(jd)])
+    r = runner.invoke(app, ["tailor", "1"])
+    assert r.exit_code == 0
+    assert "Tailored bullets for Acme" in r.output
+
+
+# --- M6 CLI: context (#42) -----------------------------------------------------
+
+def test_context_pack_pastes_cleanly(db):
+    runner.invoke(app, ["add", "-t", "Shipped the schema migration", "-o", "opencode", "-p", "magpie"])
+    from cdesk.db import init_db, store_journal_entry
+    from cdesk.capture.paste import add_capture
+    conn = init_db()
+    cid, _ = add_capture(conn, "Shipped the schema migration", project_id=1)
+    entry_id = store_journal_entry(conn, "2026-10-18", "daily",
+                                   [{"text": "Decided to reuse the citation verifier.",
+                                     "cites": [cid]}])
+    conn.execute("UPDATE journal_entry SET status='approved' WHERE id=?", (entry_id,))
+    conn.commit()
+    conn.close()
+    r = runner.invoke(app, ["context", "magpie", "--days", "36500"])
+    assert r.exit_code == 0
+    assert "# Project brief: magpie" in r.output
+    assert "## Decisions" in r.output
+
+
+def test_context_empty_project_still_works(db):
+    r = runner.invoke(app, ["context", "nope"])
+    assert r.exit_code == 0
+    assert "_(no approved journal lines matched this project yet)_" in r.output
+
+
+# --- M6 CLI: --project on capture add -------------------------------------------
+
+def test_add_with_project_creates_and_assigns(db):
+    r = runner.invoke(app, ["add", "-t", "work on magpie", "-o", "opencode", "-p", "magpie"])
+    assert r.exit_code == 0
+    assert "Captured #1" in r.output
+    from cdesk.db import init_db, captures_for_project, list_projects
+    conn = init_db()
+    projects = list_projects(conn)
+    assert any(p["name"] == "magpie" for p in projects)
+    proj = next(p for p in projects if p["name"] == "magpie")
+    caps = captures_for_project(conn, proj["id"])
+    assert len(caps) == 1
+    conn.close()
