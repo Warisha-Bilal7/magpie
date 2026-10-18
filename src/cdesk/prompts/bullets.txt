@@ -1,0 +1,10 @@
+Write resume bullets for this job using ONLY the EVIDENCE below.
+Return JSON: {"bullets": [{"text": "...", "cites": [line ids]}]}.
+Each bullet must cite the evidence line ids it came from.
+Do not add numbers, dates, links or names that are not in the cited evidence.
+
+REQUIREMENTS:
+{requirements}
+
+EVIDENCE (journal lines):
+{evidence}

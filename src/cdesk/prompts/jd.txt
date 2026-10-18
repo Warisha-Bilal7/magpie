@@ -1,0 +1,7 @@
+Extract the requirements from this job description.
+Return JSON: {"requirements": [{"text": "..."}]}.
+One entry per concrete requirement (skills, responsibilities, qualifications).
+Use only what the job description says. No inference.
+
+JOB DESCRIPTION:
+{jd_text}

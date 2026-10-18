@@ -1,0 +1,8 @@
+You are summarizing a person's captured work notes into a journal.
+Return JSON: {"lines": [{"text": "...", "cites": [capture ids]}]}.
+Each line is one concrete thing done, decided, or learned. Use only what is in the captures.
+Every line must cite the capture ids it came from. Do not add numbers, dates or links that
+are not in the cited captures. No filler, no praise.
+
+CAPTURES:
+{captures}

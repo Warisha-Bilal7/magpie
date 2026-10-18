@@ -1,0 +1,202 @@
+"""SQLite schema, migrations and helpers. See docs/PLAN.md section 5.
+
+Schema changes MUST go through migrations: bump SCHEMA_VERSION, append SQL to
+MIGRATIONS, and never edit an old migration in place.
+"""
+
+import sqlite3
+from pathlib import Path
+
+from .config import DB_PATH, ensure_dirs
+
+SCHEMA_VERSION = 1
+
+INIT_SCHEMA = """
+CREATE TABLE IF NOT EXISTS workspace (
+  id INTEGER PRIMARY KEY,
+  name TEXT UNIQUE NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('substack','linkedin','society','personal','other')),
+  cadence_days INTEGER,              -- target: post every N days
+  rules_json TEXT,                   -- max_chars, max_hashtags, banned phrases, tone notes
+  audience TEXT
+);
+
+CREATE TABLE IF NOT EXISTS project (
+  id INTEGER PRIMARY KEY,
+  name TEXT UNIQUE NOT NULL,
+  note TEXT
+);
+
+CREATE TABLE IF NOT EXISTS capture (
+  id INTEGER PRIMARY KEY,
+  source TEXT NOT NULL,              -- paste | file | git | chat_export | quick
+  origin TEXT,                       -- e.g. "claude-acct-2", "gemini", "opencode", repo path
+  title TEXT,
+  body TEXT NOT NULL,
+  content_hash TEXT UNIQUE,          -- sha256 of body, for dedupe
+  happened_at TEXT,                  -- when the work happened (ISO)
+  captured_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  project_id INTEGER REFERENCES project(id),
+  tags TEXT
+);
+CREATE VIRTUAL TABLE IF NOT EXISTS capture_fts USING fts5(title, body);
+
+CREATE TABLE IF NOT EXISTS journal_entry (
+  id INTEGER PRIMARY KEY,
+  day TEXT NOT NULL,                 -- yyyy-mm-dd (week start for weekly entries)
+  kind TEXT NOT NULL CHECK (kind IN ('daily','weekly')),
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','approved')),
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS journal_line (
+  id INTEGER PRIMARY KEY,
+  entry_id INTEGER NOT NULL REFERENCES journal_entry(id),
+  text TEXT NOT NULL,
+  capture_ids TEXT NOT NULL,         -- JSON list of capture ids (the receipts)
+  embedding BLOB
+);
+
+CREATE TABLE IF NOT EXISTS post (
+  id INTEGER PRIMARY KEY,
+  workspace_id INTEGER NOT NULL REFERENCES workspace(id),
+  title TEXT,
+  body_md TEXT,
+  status TEXT NOT NULL DEFAULT 'idea'
+    CHECK (status IN ('idea','draft','approved','scheduled','published')),
+  scheduled_at TEXT,
+  published_at TEXT,
+  source_ids TEXT,                   -- JSON: journal line ids / capture ids used
+  parent_post_id INTEGER REFERENCES post(id),   -- repurposed from
+  warnings TEXT                      -- JSON list from fact/rules checks
+);
+
+CREATE TABLE IF NOT EXISTS past_post (             -- voice corpus: your real published posts
+  id INTEGER PRIMARY KEY,
+  workspace_id INTEGER NOT NULL REFERENCES workspace(id),
+  body TEXT NOT NULL,
+  url TEXT,
+  published_at TEXT,
+  embedding BLOB
+);
+
+CREATE TABLE IF NOT EXISTS idea (
+  id INTEGER PRIMARY KEY,
+  title TEXT NOT NULL,
+  note TEXT,
+  status TEXT NOT NULL DEFAULT 'spark'
+    CHECK (status IN ('spark','researching','building','shipped','parked')),
+  effort INTEGER, impact INTEGER,    -- 1-5
+  next_step TEXT,
+  source_ids TEXT,                   -- JSON capture ids
+  embedding BLOB,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS job (
+  id INTEGER PRIMARY KEY,
+  company TEXT NOT NULL, role TEXT NOT NULL, url TEXT,
+  status TEXT NOT NULL DEFAULT 'saved'
+    CHECK (status IN ('saved','applied','interviewing','offer','closed')),
+  deadline TEXT, applied_on TEXT,
+  jd_text TEXT, notes TEXT
+);
+
+CREATE TABLE IF NOT EXISTS reminder (
+  id INTEGER PRIMARY KEY,
+  kind TEXT NOT NULL,                -- post | deadline | follow_up | review
+  ref_table TEXT, ref_id INTEGER,
+  title TEXT NOT NULL,
+  due_at TEXT NOT NULL,
+  done INTEGER NOT NULL DEFAULT 0
+);
+"""
+
+# Each migration runs after the previous SCHEMA_VERSION is applied.
+# Append new entries; never edit ones already released.
+MIGRATIONS: dict[int, str] = {
+    # 2: "ALTER TABLE capture ADD COLUMN starred INTEGER DEFAULT 0;",
+}
+
+
+def connect(db_path: Path | str | None = None) -> sqlite3.Connection:
+    """Open a connection with sane defaults (foreign keys, row access by name)."""
+    path = Path(db_path) if db_path else DB_PATH
+    if path != ":memory:":
+        path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+def current_version(conn: sqlite3.Connection) -> int:
+    return conn.execute("PRAGMA user_version").fetchone()[0]
+
+
+def migrate(conn: sqlite3.Connection) -> None:
+    """Apply any pending migrations, oldest first."""
+    version = current_version(conn)
+    if version < 1:
+        conn.executescript(INIT_SCHEMA)
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+        version = SCHEMA_VERSION
+    for target in sorted(MIGRATIONS):
+        if version < target:
+            conn.executescript(MIGRATIONS[target])
+            conn.execute(f"PRAGMA user_version = {target}")
+            version = target
+    conn.commit()
+
+
+def init_db(db_path: Path | str | None = None) -> sqlite3.Connection:
+    """Create data dirs and return a migrated connection."""
+    if db_path is None:
+        ensure_dirs()
+    conn = connect(db_path)
+    migrate(conn)
+    return conn
+
+
+# --- small helpers used across modules -------------------------------------
+
+def insert_capture(conn: sqlite3.Connection, cap: dict) -> int | None:
+    """Insert a capture; keep FTS in sync. Returns id, or None if duplicate hash."""
+    try:
+        cur = conn.execute(
+            """INSERT INTO capture
+               (source, origin, title, body, content_hash, happened_at, project_id, tags)
+               VALUES (:source, :origin, :title, :body, :content_hash, :happened_at,
+                       :project_id, :tags)""",
+            {
+                "source": cap["source"],
+                "origin": cap.get("origin"),
+                "title": cap.get("title"),
+                "body": cap["body"],
+                "content_hash": cap.get("content_hash"),
+                "happened_at": cap.get("happened_at"),
+                "project_id": cap.get("project_id"),
+                "tags": cap.get("tags"),
+            },
+        )
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        return None
+    rowid = cur.lastrowid
+    conn.execute(
+        "INSERT INTO capture_fts(rowid, title, body) VALUES (?, ?, ?)",
+        (rowid, cap.get("title") or "", cap["body"]),
+    )
+    conn.commit()
+    return rowid
+
+
+def search_captures(conn: sqlite3.Connection, query: str) -> list[sqlite3.Row]:
+    """FTS search over captures (M1 wires this into the CLI/UI properly)."""
+    rows = conn.execute(
+        """SELECT c.* FROM capture c
+           JOIN capture_fts f ON f.rowid = c.id
+           WHERE capture_fts MATCH ?
+           ORDER BY rank""",
+        (query,),
+    ).fetchall()
+    return list(rows)

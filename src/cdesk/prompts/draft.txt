@@ -1,0 +1,12 @@
+Write a {platform} post in the same voice as the EXAMPLES.
+Use ONLY the facts in SOURCE. Do not add dates, times, numbers, links, names or @handles
+that are not in SOURCE. Obey the rules: {rules}.
+{feedback}
+
+EXAMPLES (past posts by the same author):
+{voice_examples}
+
+SOURCE:
+{source_text}
+
+BRIEF: {brief}
