@@ -19,9 +19,17 @@ Source of truth: docs/PLAN.md. Build one milestone per session, on its own branc
   coding agent can quietly loosen them to make a test pass.
 - After each milestone, run the app on real captures before moving on.
 
-## Current milestone: M0 Setup and data model
-- [x] Repo skeleton, AGENTS.md, docs/PLAN.md
-- [x] Schema and migrations in db.py
-- [x] config.py with models and platform rules
-- [x] Stub graphs and CLI skeleton
-- [x] Ollama: confirm structured output and embeddings work (run `cdesk doctor`)
+## Current milestone: M1 Capture
+- [x] Paste and quick-add capture with content-hash dedupe
+- [x] File drop and drop-folder watcher
+- [x] Chat-export parser (ChatGPT JSON, generic messages, markdown transcripts; paste fallback)
+- [x] Git capture per repo per day
+- [x] FTS search over captures (triggers keep the index in sync)
+- [x] Origin tagging (--origin flag, CDESK_ORIGIN env, default "unknown")
+
+## Notes for later milestones
+- Schema is at v2 (FTS sync triggers). Bump MIGRATIONS in db.py for any table change;
+  never edit a released migration.
+- Git `--since` bare dates are end-of-day approxidate in git >= 2.5x; pass full timestamps.
+- The CLI is `cdesk`, not `desk` (Windows desk.cpl collision).
+- CLI never prints capture bodies (AGENTS.md rule); listings are id/date/origin/title only.
