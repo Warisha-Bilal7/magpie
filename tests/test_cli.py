@@ -134,7 +134,10 @@ def test_journal_weekly_from_daily_lines(db, monkeypatch):
     assert "capture inbox" in r.output
 
 
-def test_draft_stub_runs_end_to_end(db):
+def test_draft_stub_runs_end_to_end(db, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("model off")
+    monkeypatch.setattr("cdesk.graphs.draft.chat", boom)
     result = runner.invoke(app, ["draft", "--brief", "shipped the capture parser"])
     assert result.exit_code == 0
     assert "shipped the capture parser" in result.output

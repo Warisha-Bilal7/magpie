@@ -92,6 +92,8 @@ def gather(state: DraftState) -> dict:
                     parts.append(idea.get("note") or "")
     text = "\n".join(p for p in parts if p).strip()
     if not text:
+        text = (state.get("source_text") or "").strip()
+    if not text:
         text = (state.get("brief") or "").strip()
     return {"source_text": text, "rules": rules or {},
             "platform": platform or "social", "attempt": 0}

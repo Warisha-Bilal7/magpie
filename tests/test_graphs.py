@@ -39,7 +39,10 @@ def test_journal_graph_empty_captures():
     assert result["lines"] == []
 
 
-def test_draft_graph_runs_end_to_end():
+def test_draft_graph_runs_end_to_end(monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("model off")
+    monkeypatch.setattr("cdesk.graphs.draft.chat", boom)
     g = build_draft_graph()
     result = g.invoke({
         "brief": "announce the workshop on 4 Nov",
