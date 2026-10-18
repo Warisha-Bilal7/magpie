@@ -56,7 +56,8 @@ def test_add_git_captures_dedupes(repo):
 
 
 def test_git_captures_since_filters_days(repo):
-    caps = git_captures(str(repo), "2026-10-15")
+    # full timestamp: bare "2026-10-15" is approxidate end-of-day in git >= 2.5x
+    caps = git_captures(str(repo), "2026-10-15T00:00:00")
     assert len(caps) == 1
     assert caps[0]["happened_at"] == "2026-10-15"
 

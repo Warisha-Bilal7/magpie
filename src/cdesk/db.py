@@ -121,12 +121,10 @@ MIGRATIONS: dict[int, str] = {
       VALUES (new.id, coalesce(new.title, ''), new.body);
     END;
     CREATE TRIGGER IF NOT EXISTS capture_fts_delete AFTER DELETE ON capture BEGIN
-      INSERT INTO capture_fts(capture_fts, rowid, title, body)
-      VALUES ('delete', old.id, coalesce(old.title, ''), old.body);
+      DELETE FROM capture_fts WHERE rowid = old.id;
     END;
     CREATE TRIGGER IF NOT EXISTS capture_fts_update AFTER UPDATE OF title, body ON capture BEGIN
-      INSERT INTO capture_fts(capture_fts, rowid, title, body)
-      VALUES ('delete', old.id, coalesce(old.title, ''), old.body);
+      DELETE FROM capture_fts WHERE rowid = old.id;
       INSERT INTO capture_fts(rowid, title, body)
       VALUES (new.id, coalesce(new.title, ''), new.body);
     END;

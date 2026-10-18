@@ -12,11 +12,16 @@ from ..db import insert_capture
 
 def git_captures(repo: str, since_iso: str) -> list[dict]:
     """One capture per repo per day, so a busy day is one note, not forty."""
-    out = subprocess.run(
+    proc = subprocess.run(
         ["git", "-C", repo, "log", f"--since={since_iso}",
          "--pretty=format:%ad%x1f%s", "--date=short"],
-        capture_output=True, text=True, check=True,
-    ).stdout
+        capture_output=True, text=True,
+    )
+    if proc.returncode != 0:
+        if "does not have any commits" in proc.stderr or "your current branch" in proc.stderr:
+            return []  # empty repo
+        raise RuntimeError(f"git log failed: {proc.stderr.strip()}")
+    out = proc.stdout
     by_day: dict[str, list[str]] = defaultdict(list)
     for row in out.splitlines():
         day, _, subject = row.partition("\x1f")
