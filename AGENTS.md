@@ -25,13 +25,18 @@ Source of truth: docs/PLAN.md. Build one milestone per session, on its own branc
 - Chat-export parser (ChatGPT JSON, generic messages, markdown; paste fallback)
 - Git capture per repo per day; FTS search (trigger-synced); origin tagging
 
-## Current milestone: M2 Journal graph
-- [x] unsupported_reasons with planted-error unit tests (verify.py)
-- [x] select and summarize nodes with structured output
-- [x] Verify node, retry with exact feedback, drop-and-warn at MAX_ATTEMPTS
-- [x] Deterministic fallback digest (daily per-capture, weekly per-day)
-- [x] CLI `cdesk journal --day/--weekly` wired to the DB
-- [x] Journal Streamlit page with per-line source expansion
+### M2 Journal graph
+- unsupported_reasons with planted-error unit tests (verify.py)
+- select and summarize nodes with structured output; verify, retry with exact feedback
+- Deterministic fallback digest (daily per-capture, weekly per-day)
+- CLI `cdesk journal --day/--weekly` wired to the DB; Journal Streamlit page
+
+## Current milestone: M3 Workspaces and voice
+- [x] Workspace CRUD with rules and cadence (cdesk.workspaces, #18)
+- [x] Import past posts per workspace; text/JSON parsers, BOM tolerated (#19)
+- [x] Embeddings as BLOB + top_k tests (cdesk.voice, injectable embedder, #20)
+- [x] Voice examples on Workspaces Streamlit page + `cdesk workspace voice` (#21)
+- [x] Banned-phrase editor (page + `cdesk workspace ban/unban`, #22)
 
 ## Notes for later milestones
 - Schema is at v2 (FTS sync triggers). Bump MIGRATIONS in db.py for any table change;
@@ -44,3 +49,5 @@ Source of truth: docs/PLAN.md. Build one milestone per session, on its own branc
   (the verifier drops them all — do not loosen the check to compensate).
 - Fallback digest line text must never add ids/dates the source lacks; the verifier
   will (rightly) drop them.
+- Windows: imported files often carry a UTF-8 BOM (parsers strip it) and consoles
+  default to cp1252 (cli.py reconfigures stdout to utf-8/replace — keep that).

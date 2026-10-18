@@ -144,3 +144,47 @@ def test_stubs_for_future_milestones(db):
     for cmd in (["nudge"], ["ics"]):
         result = runner.invoke(app, cmd)
         assert result.exit_code == 0
+
+
+def test_workspace_add_and_list(db):
+    r = runner.invoke(app, ["workspace", "add", "LinkedIn", "-k", "linkedin", "--cadence", "3"])
+    assert r.exit_code == 0
+    assert "created" in r.output
+    r2 = runner.invoke(app, ["workspace", "list"])
+    assert "LinkedIn" in r2.output
+    assert "every 3d" in r2.output
+
+
+def test_workspace_add_bad_kind(db):
+    r = runner.invoke(app, ["workspace", "add", "X", "-k", "nope"])
+    assert r.exit_code == 1
+
+
+def test_workspace_ban_and_unban(db):
+    runner.invoke(app, ["workspace", "add", "LI", "-k", "linkedin"])
+    r = runner.invoke(app, ["workspace", "ban", "game-changer", "-w", "LI"])
+    assert "game-changer" in r.output
+    r2 = runner.invoke(app, ["workspace", "unban", "game-changer", "-w", "LI"])
+    assert "game-changer" not in r2.output.split(":")[-1]
+
+
+def test_workspace_import_posts(db, tmp_path):
+    runner.invoke(app, ["workspace", "add", "Sub", "-k", "substack"])
+    p = tmp_path / "posts.txt"
+    p.write_text("First essay\n---\nSecond essay", encoding="utf-8")
+    r = runner.invoke(app, ["workspace", "import-posts", str(p), "-w", "Sub"])
+    assert r.exit_code == 0
+    assert "Imported 2 past post(s)" in r.output
+
+
+def test_workspace_voice_without_corpus(db):
+    runner.invoke(app, ["workspace", "add", "LI", "-k", "linkedin"])
+    r = runner.invoke(app, ["workspace", "voice", "anything", "-w", "LI"])
+    assert r.exit_code == 0
+    assert "No indexed past posts" in r.output
+
+
+def test_workspace_unknown_name(db):
+    r = runner.invoke(app, ["workspace", "ban", "x", "-w", "Missing"])
+    assert r.exit_code == 1
+    assert "No workspace named" in r.output

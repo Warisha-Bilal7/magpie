@@ -16,7 +16,14 @@ import typer
 from . import __version__
 from .config import EMBED_MODEL, MODEL_NAME, PLATFORM_RULES, default_origin, ensure_dirs
 
+# Windows consoles default to cp1252; non-ASCII output (BOMs, smart quotes
+# from imported posts) must never crash a command.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 app = typer.Typer(help="Content Desk — local-first work journal and posting desk.", no_args_is_help=True)
+ws_app = typer.Typer(help="Workspaces: channels, rules and the past-post voice corpus.", no_args_is_help=True)
+app.add_typer(ws_app, name="workspace")
 
 
 @app.callback()
@@ -313,6 +320,147 @@ def context(
 ) -> None:
     """Generate a paste-ready context pack for a project (M6)."""
     typer.echo(f"Context pack for '{project}' lands in M6.")
+
+
+# --- workspace subcommands (M3) ---------------------------------------------
+
+def _ws_or_die(conn, name: str) -> dict:
+    from .workspaces import get_workspace
+    ws = get_workspace(conn, name=name)
+    if ws is None:
+        typer.echo(f"No workspace named '{name}'. Create it with `cdesk workspace add`.")
+        raise typer.Exit(code=1)
+    return ws
+
+
+@ws_app.command("add")
+def ws_add(
+    name: str = typer.Argument(...),
+    kind: str = typer.Option(..., "-k", "--kind", help="substack|linkedin|society|personal|other"),
+    cadence: int | None = typer.Option(None, "--cadence", help="Post every N days."),
+    audience: str | None = typer.Option(None, "--audience", help="Who reads this channel."),
+) -> None:
+    """Create a workspace (one per channel)."""
+    from .workspaces import create_workspace
+    conn = _open_db()
+    try:
+        ws = create_workspace(conn, name, kind=kind, cadence_days=cadence, audience=audience)
+    except ValueError as e:
+        typer.echo(str(e))
+        raise typer.Exit(code=1)
+    finally:
+        conn.close()
+    typer.echo(f"Workspace #{ws['id']} {ws['name']} ({ws['kind']}) created.")
+
+
+@ws_app.command("list")
+def ws_list() -> None:
+    """List workspaces with cadence and voice-corpus size."""
+    from .workspaces import list_workspaces
+    conn = _open_db()
+    try:
+        rows = list_workspaces(conn)
+        for w in rows:
+            n = conn.execute(
+                "SELECT COUNT(*) FROM past_post WHERE workspace_id = ?", (w["id"],)
+            ).fetchone()[0]
+            cadence = f"every {w['cadence_days']}d" if w["cadence_days"] else "no cadence"
+            typer.echo(f"#{w['id']} {w['name']} ({w['kind']}, {cadence}, {n} past posts)")
+    finally:
+        conn.close()
+
+
+@ws_app.command("import-posts")
+def ws_import_posts(
+    file: str = typer.Argument(..., help="Text file (posts separated by ---) or JSON list."),
+    workspace: str = typer.Option(..., "-w", "--workspace"),
+) -> None:
+    """Import past posts as the workspace's voice corpus, then index embeddings."""
+    from pathlib import Path
+
+    from .workspaces import import_posts, parse_posts_json, parse_posts_text
+    p = Path(file)
+    raw = p.read_text(encoding="utf-8", errors="replace")
+    try:
+        posts = parse_posts_json(raw) if p.suffix.lower() == ".json" else parse_posts_text(raw)
+    except ValueError as e:
+        typer.echo(f"could not parse: {e}")
+        raise typer.Exit(code=1)
+    conn = _open_db()
+    try:
+        ws = _ws_or_die(conn, workspace)
+        ids = import_posts(conn, ws["id"], posts)
+        typer.echo(f"Imported {len(ids)} past post(s) into {ws['name']}.")
+        from .workspaces import index_workspace_embeddings
+        try:
+            n = index_workspace_embeddings(conn, ws["id"])
+            typer.echo(f"Indexed embeddings for {n} post(s).")
+        except Exception as e:
+            typer.echo(f"Embeddings deferred (Ollama unavailable?): {e}")
+    finally:
+        conn.close()
+
+
+@ws_app.command("ban")
+def ws_ban(
+    phrase: str = typer.Argument(...),
+    workspace: str = typer.Option(..., "-w", "--workspace"),
+) -> None:
+    """Add a banned phrase to a workspace's rules (style lint)."""
+    from .workspaces import add_banned_phrase, effective_rules, get_workspace
+    conn = _open_db()
+    try:
+        ws = _ws_or_die(conn, workspace)
+        add_banned_phrase(conn, ws["id"], phrase)
+        rules = effective_rules(get_workspace(conn, ws["id"]))
+        typer.echo(f"Banned phrases for {ws['name']}: {rules['banned']}")
+    finally:
+        conn.close()
+
+
+@ws_app.command("unban")
+def ws_unban(
+    phrase: str = typer.Argument(...),
+    workspace: str = typer.Option(..., "-w", "--workspace"),
+) -> None:
+    """Remove a banned phrase from a workspace's rules."""
+    from .workspaces import effective_rules, get_workspace, remove_banned_phrase
+    conn = _open_db()
+    try:
+        ws = _ws_or_die(conn, workspace)
+        remove_banned_phrase(conn, ws["id"], phrase)
+        rules = effective_rules(get_workspace(conn, ws["id"]))
+        typer.echo(f"Banned phrases for {ws['name']}: {rules['banned']}")
+    finally:
+        conn.close()
+
+
+@ws_app.command("voice")
+def ws_voice(
+    query: str = typer.Argument(..., help="Text to find similar past posts for."),
+    workspace: str = typer.Option(..., "-w", "--workspace"),
+    k: int = typer.Option(3, "-k"),
+) -> None:
+    """Show the k most similar past posts (the voice examples for drafting)."""
+    from .voice import voice_examples
+    from .workspaces import index_workspace_embeddings
+    conn = _open_db()
+    try:
+        ws = _ws_or_die(conn, workspace)
+        try:
+            index_workspace_embeddings(conn, ws["id"])
+            examples = voice_examples(conn, ws["id"], query, k=k)
+        except Exception as e:
+            typer.echo(f"voice retrieval failed (Ollama unavailable?): {e}")
+            raise typer.Exit(code=1)
+    finally:
+        conn.close()
+    if not examples:
+        typer.echo("No indexed past posts yet. Import some with `cdesk workspace import-posts`.")
+        return
+    for i, ex in enumerate(examples, 1):
+        preview = ex["body"].replace("\n", " ")[:100]
+        typer.echo(f"{i}. #{ex['id']} {preview}")
 
 
 if __name__ == "__main__":
