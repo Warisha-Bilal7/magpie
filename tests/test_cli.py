@@ -103,10 +103,35 @@ def test_chat_import(db, tmp_path):
     assert "1 new conversation(s)" in r.output
 
 
-def test_journal_stub_runs_end_to_end(db):
-    result = runner.invoke(app, ["journal", "--day", "2026-10-18"])
-    assert result.exit_code == 0
-    assert "stub line" in result.output
+def test_journal_day_with_captures(db, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("model off")
+    monkeypatch.setattr("cdesk.graphs.journal.chat", boom)
+    runner.invoke(app, ["add", "-t", "Shipped the capture inbox", "-o", "opencode"])
+    r = runner.invoke(app, ["journal", "--day", __import__("datetime").date.today().isoformat()])
+    assert r.exit_code == 0
+    assert "digest fallback" in r.output
+    assert "capture inbox" in r.output
+
+
+def test_journal_empty_day_warns(db):
+    r = runner.invoke(app, ["journal", "--day", "2020-01-01"])
+    assert r.exit_code == 0
+    assert "no captures" in r.output
+
+
+def test_journal_weekly_from_daily_lines(db, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("model off")
+    monkeypatch.setattr("cdesk.graphs.journal.chat", boom)
+    import datetime
+    today = datetime.date.today().isoformat()
+    runner.invoke(app, ["add", "-t", "Shipped the capture inbox", "-o", "opencode"])
+    runner.invoke(app, ["journal", "--day", today])
+    r = runner.invoke(app, ["journal", "--day", today, "--weekly"])
+    assert r.exit_code == 0
+    assert "weekly" in r.output
+    assert "capture inbox" in r.output
 
 
 def test_draft_stub_runs_end_to_end(db):

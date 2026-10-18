@@ -63,13 +63,15 @@ def fallback_digest(state: JournalState) -> list[dict]:
             cites = sorted({c for l in day_lines for c in l.get("capture_ids", [])})
             lines.append({"text": text, "cites": cites})
         return lines
-    return [
-        {
-            "text": (c.get("title") or c.get("origin") or "capture"),
-            "cites": [c["id"]],
-        }
-        for c in state.get("captures", [])
-    ]
+    def _digest_text(c: dict) -> str:
+        if c.get("title"):
+            return c["title"]
+        first = (c.get("body") or "").strip().splitlines()
+        if first:
+            return first[0][:80]
+        return c.get("origin") or "capture"
+
+    return [{"text": _digest_text(c), "cites": [c["id"]]} for c in state.get("captures", [])]
 
 
 def _prompt_captures(trimmed: list[dict]) -> str:

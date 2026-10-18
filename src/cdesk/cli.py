@@ -8,7 +8,6 @@ Capture bodies are never printed by the CLI (AGENTS.md: no bodies in logs);
 listings show id, date, origin and title only.
 """
 
-import json
 import sys
 from datetime import date
 
@@ -234,18 +233,51 @@ def watch(
 @app.command()
 def journal(
     day: str | None = typer.Option(None, "--day", "-d", help="yyyy-mm-dd; defaults to today."),
-    weekly: bool = typer.Option(False, "--weekly", help="Generate a weekly entry."),
+    weekly: bool = typer.Option(False, "--weekly", help="Weekly digest from the week's daily lines."),
 ) -> None:
-    """Run the journal graph over a day's captures (stub in M0, real in M2)."""
+    """Run the journal graph over a day's captures (or the week's daily lines)."""
+    from datetime import timedelta
+
+    from .db import captures_by_ids, captures_for_day, daily_lines_between, init_db
     from .graphs.journal import build_journal_graph
 
     day = day or date.today().isoformat()
-    result = build_journal_graph().invoke(
-        {"day": day, "kind": "weekly" if weekly else "daily", "captures": []}
-    )
-    typer.echo(f"Journal ({day}): {len(result.get('lines', []))} stub line(s).")
-    if result.get("warnings"):
-        typer.echo("Warnings: " + json.dumps(result["warnings"]))
+    conn = init_db()
+    try:
+        state: dict = {"model_name": MODEL_NAME}
+        if weekly:
+            start = date.fromisoformat(day)
+            start = start - timedelta(days=start.weekday())  # Monday
+            end = start + timedelta(days=6)
+            source_lines = daily_lines_between(conn, start.isoformat(), end.isoformat())
+            cap_ids = [c for ln in source_lines for c in ln["capture_ids"]]
+            state.update({
+                "day": start.isoformat(), "kind": "weekly",
+                "source_lines": source_lines,
+                "captures": list(captures_by_ids(conn, cap_ids).values()),
+                "conn": conn,
+            })
+            if not source_lines:
+                typer.echo(f"No daily journal lines in week of {start.isoformat()}.")
+                return
+        else:
+            state.update({
+                "day": day, "kind": "daily",
+                "captures": captures_for_day(conn, day),
+                "conn": conn,
+            })
+        result = build_journal_graph().invoke(state)
+    finally:
+        conn.close()
+
+    tag = " (digest fallback)" if result.get("used_fallback") else ""
+    typer.echo(f"Journal entry #{result.get('entry_id', 0)} ({result['kind']} {result['day']}){tag}")
+    for ln in result.get("lines", []):
+        typer.echo(f"  - {ln['text']}  [captures: {ln['cites']}]")
+    for w in result.get("warnings", []):
+        typer.echo(f"  warning: {w}")
+    if not result.get("lines") and not result.get("warnings"):
+        typer.echo("  (no lines)")
 
 
 @app.command()
