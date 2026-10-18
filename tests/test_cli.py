@@ -138,9 +138,38 @@ def test_draft_stub_runs_end_to_end(db, monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("model off")
     monkeypatch.setattr("cdesk.graphs.draft.chat", boom)
-    result = runner.invoke(app, ["draft", "--brief", "shipped the capture parser"])
+    runner.invoke(app, ["workspace", "add", "Personal", "-k", "personal"])
+    result = runner.invoke(app, ["draft", "--brief", "shipped the capture parser",
+                                 "--workspace", "Personal"])
     assert result.exit_code == 0
     assert "shipped the capture parser" in result.output
+    assert "template fallback" in result.output
+
+
+def test_draft_requires_brief_or_source(db):
+    runner.invoke(app, ["workspace", "add", "Personal", "-k", "personal"])
+    r = runner.invoke(app, ["draft", "--workspace", "Personal"])
+    assert r.exit_code == 1
+    assert "--brief" in r.output
+
+
+def test_drafts_list_and_repurpose(db, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("model off")
+    monkeypatch.setattr("cdesk.graphs.draft.chat", boom)
+    runner.invoke(app, ["workspace", "add", "LI", "-k", "linkedin"])
+    runner.invoke(app, ["workspace", "add", "Sub", "-k", "substack"])
+    r = runner.invoke(app, ["draft", "--brief", "shipped v2", "--workspace", "LI"])
+    assert "Draft #1" in r.output
+    r2 = runner.invoke(app, ["drafts", "--workspace", "LI"])
+    assert "#1" in r2.output
+    r3 = runner.invoke(app, ["drafts"])
+    assert "#1" in r3.output
+    r4 = runner.invoke(app, ["repurpose", "1", "--workspace", "Sub"])
+    assert r4.exit_code == 0
+    assert "Repurposed post #1" in r4.output
+    r5 = runner.invoke(app, ["repurpose", "99", "--workspace", "Sub"])
+    assert r5.exit_code == 1
 
 
 def test_stubs_for_future_milestones(db):
