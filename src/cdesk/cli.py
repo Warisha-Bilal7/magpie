@@ -15,7 +15,7 @@ from datetime import date
 import typer
 
 from . import __version__
-from .config import EMBED_MODEL, MODEL_NAME, PLATFORM_RULES, default_origin, ensure_dirs
+from .config import EMBED_MODEL, MODEL_NAME, default_origin, ensure_dirs
 
 # Windows consoles default to cp1252; non-ASCII output (BOMs, smart quotes
 # from imported posts) must never crash a command.
