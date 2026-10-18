@@ -47,17 +47,32 @@ Source of truth: docs/PLAN.md. Build one milestone per session, on its own branc
 - Repurpose across workspaces (`repurpose_post`, `cdesk repurpose`, #29)
 - Drafts Streamlit page with warnings in red (#30)
 
-## Current milestone: M5 Planner and nudges
-- [x] Post scheduling and status flow (`set_post_status`, validated transitions, #31)
-- [x] due_nudges with tests (never posted, on time, overdue, exact gap; #32)
-- [x] Reminders table helpers + Planner page weekly-review tab (#33)
-- [x] Week and month planner view (5_Planner.py; #34)
-- [x] to_ics export (`cdesk ics`, escaping + duration tested; #35)
-- [x] Nudge text template + drafts-ready suggestion (`cdesk nudge`; #36)
+### M5 Planner and nudges
+- set_post_status with validated transitions; drafts_ready and due_nudges (#31, #32)
+- Reminders table helpers (`list_reminders`, `complete_reminder`; #33)
+- Week/month view, reminders and weekly review on 5_Planner.py (#34)
+- to_ics export with escaping and duration (`cdesk ics`; #35)
+- Nudge text template + drafts-ready suggestion (`cdesk nudge`; #36)
+
+### M6 Organizers
+- Idea cards: CRUD, statuses, effort/impact, source links (cdesk.ideas, #37)
+- Duplicate detection: tunable cosine threshold + keyword fallback (#38)
+- Job tracker: kanban, deadlines, follow-up reminders (cdesk.jobs; #39)
+- Job tailor graph: parse_jd, match_evidence, write_bullets, citation verify (#40)
+- Cover letter grounded in cited lines, fact-checked (`draft_cover_letter`, #41)
+- Context pack generator + `cdesk context` (cdesk.context_pack; #42)
+- CLI `idea`/`job` sub-apps, `tailor`/`cover`; `--project` on `cdesk add`
+- Streamlit 6_Ideas.py (cards by status) and 7_Jobs.py (kanban, tailor buttons)
+
+## Current milestone: M7 Eval, dogfood, write-up
 
 ## Notes for later milestones
-- Schema is at v2 (FTS sync triggers). Bump MIGRATIONS in db.py for any table change;
-  never edit a released migration.
+- Schema is at v3 (adds `job_artifact`, project helpers on `capture`). Bump MIGRATIONS in db.py
+  for any table change; never edit a released migration.
+- Idea/job matching: `duplicates_for(vec, rows, threshold)` takes a vector and candidate rows;
+  the `(conn, title, note, ...)` wrapper is `find_duplicates`. Jobs use the same shape in jobs.py.
+- Context packs are deterministic (no model): decisions/questions come from regex over journal
+  lines, linked ideas from capture-id overlap. There is no `decision` table.
 - Git `--since` bare dates are end-of-day approxidate in git >= 2.5x; pass full timestamps.
 - The CLI is `cdesk`, not `desk` (Windows desk.cpl collision).
 - CLI never prints capture bodies (AGENTS.md rule); listings are id/date/origin/title only.

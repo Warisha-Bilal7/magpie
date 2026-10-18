@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .config import DB_PATH, ensure_dirs
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 INIT_SCHEMA = """
 CREATE TABLE IF NOT EXISTS workspace (
@@ -129,6 +129,20 @@ MIGRATIONS: dict[int, str] = {
       INSERT INTO capture_fts(rowid, title, body)
       VALUES (new.id, coalesce(new.title, ''), new.body);
     END;
+    """,
+    # v3: store generated job-tailoring artifacts (resume bullets, cover letters)
+    # with the citations and warnings the verifier produced.
+    3: """
+    CREATE TABLE IF NOT EXISTS job_artifact (
+      id INTEGER PRIMARY KEY,
+      job_id INTEGER NOT NULL REFERENCES job(id),
+      kind TEXT NOT NULL CHECK (kind IN ('bullets','cover')),
+      body TEXT NOT NULL,
+      citations TEXT,                  -- JSON: per-bullet cites / cover evidence ids
+      warnings TEXT,                   -- JSON list from the citation verifier
+      used_fallback INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
     """,
 }
 
@@ -359,3 +373,37 @@ def list_posts(
 def get_idea(conn: sqlite3.Connection, idea_id: int) -> dict | None:
     row = conn.execute("SELECT * FROM idea WHERE id = ?", (idea_id,)).fetchone()
     return dict(row) if row else None
+
+
+# --- projects (M6, context packs) -------------------------------------------
+
+def get_or_create_project(conn: sqlite3.Connection, name: str) -> dict:
+    """Projects are created on first mention so a context pack needs no setup."""
+    name = name.strip()
+    if not name:
+        raise ValueError("project name is empty")
+    row = conn.execute("SELECT * FROM project WHERE name = ?", (name,)).fetchone()
+    if row is None:
+        cur = conn.execute("INSERT INTO project (name) VALUES (?)", (name,))
+        conn.commit()
+        row = conn.execute("SELECT * FROM project WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return dict(row)
+
+
+def list_projects(conn: sqlite3.Connection) -> list[dict]:
+    rows = conn.execute("SELECT * FROM project ORDER BY name").fetchall()
+    return [dict(r) for r in rows]
+
+
+def captures_for_project(conn: sqlite3.Connection, project_id: int, limit: int = 200) -> list[dict]:
+    """Captures assigned to a project, newest first."""
+    rows = conn.execute(
+        "SELECT * FROM capture WHERE project_id = ? ORDER BY captured_at DESC, id DESC LIMIT ?",
+        (project_id, limit),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def assign_capture_project(conn: sqlite3.Connection, capture_id: int, project_id: int) -> None:
+    conn.execute("UPDATE capture SET project_id = ? WHERE id = ?", (project_id, capture_id))
+    conn.commit()

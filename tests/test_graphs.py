@@ -62,8 +62,28 @@ def test_draft_router_saves_when_clean():
     assert draft_router({"violations": ["x"], "attempt": MAX_ATTEMPTS}) == "save"
 
 
-def test_job_tailor_graph_runs_end_to_end():
+def test_job_tailor_graph_runs_end_to_end(monkeypatch):
+    from cdesk.db import init_db, store_journal_entry
+    from cdesk.jobs import add_job
+
+    conn = init_db(":memory:")
+    entry_id = store_journal_entry(conn, "2026-10-01", "daily", [
+        {"text": "Shipped the Python SQLite cache", "cites": [1]},
+        {"text": "Tuned SQL skills on the query planner", "cites": [1]},
+    ])
+    conn.execute("UPDATE journal_entry SET status = 'approved' WHERE id = ?",
+                 (entry_id,))
+    conn.commit()
+    job = add_job(conn, "Acme", "Backend Engineer", jd_text="Python experience\nSQL skills")
+
+    def boom(*a, **k):
+        raise RuntimeError("model off")
+    monkeypatch.setattr("cdesk.graphs.job_tailor.chat", boom)
+
     g = build_job_tailor_graph()
-    result = g.invoke({"jd_text": "Python experience\nSQL skills"})
-    assert len(result["bullets"]) == 2
+    result = g.invoke({
+        "conn": conn, "job_id": job["id"], "jd_text": job["jd_text"],
+        "company": job["company"], "role": job["role"],
+    })
+    assert len(result["bullets"]) == 2  # one verbatim quote per requirement
     assert result["used_fallback"] is True

@@ -69,8 +69,10 @@ def test_list_origins_distinct_sorted(conn):
 
 
 def test_migration_v2_applied():
+    from cdesk.db import SCHEMA_VERSION
+
     c = init_db(":memory:")
-    assert current_version(c) == 2
+    assert current_version(c) == SCHEMA_VERSION
     triggers = c.execute(
         "SELECT name FROM sqlite_master WHERE type='trigger'"
     ).fetchall()
