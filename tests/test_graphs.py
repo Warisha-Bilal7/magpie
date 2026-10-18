@@ -4,7 +4,10 @@ from cdesk.graphs.journal import build_journal_graph
 from cdesk.graphs.job_tailor import build_job_tailor_graph
 
 
-def test_journal_graph_runs_with_stub_captures():
+def test_journal_graph_runs_with_stub_captures(monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("model off")
+    monkeypatch.setattr("cdesk.graphs.journal.chat", boom)
     g = build_journal_graph()
     result = g.invoke({
         "day": "2026-10-18",
@@ -19,13 +22,15 @@ def test_journal_graph_runs_with_stub_captures():
     assert result["used_fallback"] is True
 
 
-def test_journal_verify_drops_uncited_lines():
+def test_journal_verify_flags_uncited_lines():
     from cdesk.graphs.journal import verify
 
-    out = verify({"lines": [{"text": "made up", "cites": []},
-                            {"text": "real", "cites": [1]}]})
-    assert out["lines"] == [{"text": "real", "cites": [1]}]
-    assert any("dropped 1" in w for w in out["warnings"])
+    out = verify({
+        "captures": [{"id": 1, "origin": "x", "title": "t", "body": "b"}],
+        "lines": [{"text": "made up", "cites": []}, {"text": "real", "cites": [1]}],
+    })
+    assert 0 in out["bad"]
+    assert 1 not in out["bad"]
 
 
 def test_journal_graph_empty_captures():
