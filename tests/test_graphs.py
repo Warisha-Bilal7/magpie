@@ -20,17 +20,18 @@ def test_journal_graph_runs_with_stub_captures():
 
 
 def test_journal_verify_drops_uncited_lines():
+    from cdesk.graphs.journal import verify
+
+    out = verify({"lines": [{"text": "made up", "cites": []},
+                            {"text": "real", "cites": [1]}]})
+    assert out["lines"] == [{"text": "real", "cites": [1]}]
+    assert any("dropped 1" in w for w in out["warnings"])
+
+
+def test_journal_graph_empty_captures():
     g = build_journal_graph()
-    result = g.invoke({
-        "day": "2026-10-18",
-        "kind": "daily",
-        "captures": [{"id": 1, "origin": "x", "title": "t", "body": "b"}],
-        "lines": [{"text": "made up", "cites": []}, {"text": "real", "cites": [1]}],
-    })
-    # summarize stub rebuilds lines from captures; empty captures -> no lines
-    result_empty = g.invoke({"day": "2026-10-18", "kind": "daily", "captures": []})
-    assert result_empty["lines"] == []
-    assert isinstance(result, dict)
+    result = g.invoke({"day": "2026-10-18", "kind": "daily", "captures": []})
+    assert result["lines"] == []
 
 
 def test_draft_graph_runs_end_to_end():

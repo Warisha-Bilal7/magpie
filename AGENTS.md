@@ -24,4 +24,4 @@ Source of truth: docs/PLAN.md. Build one milestone per session, on its own branc
 - [x] Schema and migrations in db.py
 - [x] config.py with models and platform rules
 - [x] Stub graphs and CLI skeleton
-- [ ] Ollama: confirm structured output and embeddings work (run `desk doctor`)
+- [ ] Ollama: confirm structured output and embeddings work (run `cdesk doctor`)

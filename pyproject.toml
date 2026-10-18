@@ -22,7 +22,7 @@ dependencies = [
 dev = ["pytest>=8"]
 
 [project.scripts]
-desk = "cdesk.cli:app"
+cdesk = "cdesk.cli:app"
 
 [build-system]
 requires = ["setuptools>=68"]

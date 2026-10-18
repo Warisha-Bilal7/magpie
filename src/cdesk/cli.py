@@ -1,7 +1,8 @@
 """Content Desk CLI. See docs/PLAN.md section 4 (repo layout).
 
-M0: `desk init`, `desk doctor` and `desk journal|draft` (stub graphs) work.
+M0: `cdesk init`, `cdesk doctor` and `cdesk journal|draft` (stub graphs) work.
 M1+ fills in add/journal/draft/nudge/ics/context against real data.
+(The command is `cdesk`, not `desk` — on Windows `desk` collides with desk.cpl.)
 """
 
 import json
@@ -63,8 +64,8 @@ def doctor() -> None:
 
 @app.command()
 def add(
-    text: typer.Option(None, "--text", "-t", help="Capture text (or omit to read stdin)."),
-    origin: typer.Option(None, "--origin", "-o", help='Where it came from, e.g. "claude-acct-2".'),
+    text: str | None = typer.Option(None, "--text", "-t", help="Capture text (or omit to read stdin)."),
+    origin: str | None = typer.Option(None, "--origin", "-o", help='Where it came from, e.g. "claude-acct-2".'),
 ) -> None:
     """Quick-add a capture to the inbox (M1)."""
     typer.echo("Capture lands in M1. For now nothing was saved.")
@@ -74,8 +75,8 @@ def add(
 
 @app.command()
 def journal(
-    day: typer.Option(None, "--day", "-d", help="yyyy-mm-dd; defaults to today."),
-    weekly: typer.Option(False, "--weekly", help="Generate a weekly entry."),
+    day: str | None = typer.Option(None, "--day", "-d", help="yyyy-mm-dd; defaults to today."),
+    weekly: bool = typer.Option(False, "--weekly", help="Generate a weekly entry."),
 ) -> None:
     """Run the journal graph over a day's captures (stub in M0, real in M2)."""
     from .graphs.journal import build_journal_graph
@@ -91,8 +92,8 @@ def journal(
 
 @app.command()
 def draft(
-    brief: typer.Option("", "--brief", "-b", help="What the draft should say."),
-    workspace: typer.Option("personal", "--workspace", "-w", help="Target workspace kind."),
+    brief: str = typer.Option("", "--brief", "-b", help="What the draft should say."),
+    workspace: str = typer.Option("personal", "--workspace", "-w", help="Target workspace kind."),
 ) -> None:
     """Run the draft graph (stub in M0, real in M4)."""
     from .graphs.draft import build_draft_graph
@@ -118,7 +119,7 @@ def ics() -> None:
 
 @app.command()
 def context(
-    project: typer.Argument(..., help="Project name for the brief."),
+    project: str = typer.Argument(..., help="Project name for the brief."),
 ) -> None:
     """Generate a paste-ready context pack for a project (M6)."""
     typer.echo(f"Context pack for '{project}' lands in M6.")
