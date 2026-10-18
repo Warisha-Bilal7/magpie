@@ -1,4 +1,4 @@
-# Content Desk
+32q# Content Desk
 
 > A local-first work journal and posting desk. It captures work scattered across AI chats, notes and git repos, turns it into a source-linked journal, and drafts posts for Substack, LinkedIn and society channels in your own voice. It also keeps a planner with posting nudges, a project-ideas organizer, and a job-application tracker whose resume bullets come from real journal entries. A local open-weight model writes; deterministic code verifies, schedules and counts. Nothing leaves the machine.
 
@@ -16,19 +16,19 @@
 
 ## 2. Features
 
-| # | Module | What it does |
-|---|---|---|
-| F1 | Capture inbox | Paste text, drop files (markdown, text, JSON chat exports), scan git repos, quick-add from the CLI. Tag each capture with its origin (for example "claude-acct-2", "gemini", "opencode", a repo path) |
-| F2 | Work journal | Daily and weekly entries drafted from captures. Every line cites its captures. Searchable by keyword and by meaning |
-| F3 | Workspaces | One per channel: Substack, LinkedIn, your society, personal. Each has a voice profile, platform rules, audience notes, cadence target and its own calendar |
-| F4 | Drafting pipeline | Source (journal lines, an existing post, or an idea) to draft in the workspace's voice, then fact-check, platform-rules check, retry, save |
-| F5 | Repurposing | One post or journal entry becomes drafts for the other workspaces |
-| F6 | Planner | Week and month view, posting slots, deadlines, reminders, "you have not posted in N days" nudges, `.ics` export for Google Calendar |
-| F7 | Ideas organizer | Idea cards with status, effort, impact, next step, links to source captures, and near-duplicate detection |
-| F8 | Context packs | Generate a compact markdown brief of a project (recent journal lines, decisions, open questions) to paste into any AI account, so scattered chats share context |
-| F9 | Job tracker | Kanban (saved, applied, interviewing, offer, closed), deadlines, follow-up reminders |
-| F10 | Job tailoring | Match a job description to your journal evidence, then draft resume bullets and a cover letter grounded in cited entries |
-| F11 | Weekly review | One page: what you shipped, what you posted, what is overdue, which idea to pick next, which applications need follow-up |
+| #   | Module            | What it does                                                                                                                                                                                          |
+| --- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F1  | Capture inbox     | Paste text, drop files (markdown, text, JSON chat exports), scan git repos, quick-add from the CLI. Tag each capture with its origin (for example "claude-acct-2", "gemini", "opencode", a repo path) |
+| F2  | Work journal      | Daily and weekly entries drafted from captures. Every line cites its captures. Searchable by keyword and by meaning                                                                                   |
+| F3  | Workspaces        | One per channel: Substack, LinkedIn, your society, personal. Each has a voice profile, platform rules, audience notes, cadence target and its own calendar                                            |
+| F4  | Drafting pipeline | Source (journal lines, an existing post, or an idea) to draft in the workspace's voice, then fact-check, platform-rules check, retry, save                                                            |
+| F5  | Repurposing       | One post or journal entry becomes drafts for the other workspaces                                                                                                                                     |
+| F6  | Planner           | Week and month view, posting slots, deadlines, reminders, "you have not posted in N days" nudges, `.ics` export for Google Calendar                                                                   |
+| F7  | Ideas organizer   | Idea cards with status, effort, impact, next step, links to source captures, and near-duplicate detection                                                                                             |
+| F8  | Context packs     | Generate a compact markdown brief of a project (recent journal lines, decisions, open questions) to paste into any AI account, so scattered chats share context                                       |
+| F9  | Job tracker       | Kanban (saved, applied, interviewing, offer, closed), deadlines, follow-up reminders                                                                                                                  |
+| F10 | Job tailoring     | Match a job description to your journal evidence, then draft resume bullets and a cover letter grounded in cited entries                                                                              |
+| F11 | Weekly review     | One page: what you shipped, what you posted, what is overdue, which idea to pick next, which applications need follow-up                                                                              |
 
 ## 3. Pipelines
 
@@ -57,19 +57,19 @@ gather -> voice -> write (LLM) -> fact_check -> rules_check --pass--> save -> EN
 parse_jd (LLM) -> match_evidence -> write_bullets (LLM) -> verify (same citation check) -> store -> END
 ```
 
-| Node | Model? | Job |
-|---|---|---|
-| select | no | Pick captures for a day or week, trim long bodies |
-| summarize | yes (structured output) | Return `lines: [{text, cites}]`, one concrete item per line |
-| verify | no | Every line has citations; numbers, dates and URLs must appear in the cited captures |
-| gather | no | Assemble the allowed facts for a draft (journal lines, source post, idea, brief) |
-| voice | no (embeddings) | Retrieve the 3 most similar past posts from the workspace as style examples |
-| write | yes | Draft the post using only the facts, in the voice shown, with the platform rules |
-| fact_check | no | Extract dates, times, URLs, handles and numbers from the draft; each must exist in the source |
-| rules_check | no | Length, hashtags, banned phrases from the workspace rules |
-| parse_jd | yes (structured output) | Job description to a list of requirements |
-| match_evidence | no (embeddings) | Find journal lines that support each requirement |
-| write_bullets | yes | Bullets using only matched lines, with citations |
+| Node           | Model?                  | Job                                                                                           |
+| -------------- | ----------------------- | --------------------------------------------------------------------------------------------- |
+| select         | no                      | Pick captures for a day or week, trim long bodies                                             |
+| summarize      | yes (structured output) | Return `lines: [{text, cites}]`, one concrete item per line                                   |
+| verify         | no                      | Every line has citations; numbers, dates and URLs must appear in the cited captures           |
+| gather         | no                      | Assemble the allowed facts for a draft (journal lines, source post, idea, brief)              |
+| voice          | no (embeddings)         | Retrieve the 3 most similar past posts from the workspace as style examples                   |
+| write          | yes                     | Draft the post using only the facts, in the voice shown, with the platform rules              |
+| fact_check     | no                      | Extract dates, times, URLs, handles and numbers from the draft; each must exist in the source |
+| rules_check    | no                      | Length, hashtags, banned phrases from the workspace rules                                     |
+| parse_jd       | yes (structured output) | Job description to a list of requirements                                                     |
+| match_evidence | no (embeddings)         | Find journal lines that support each requirement                                              |
+| write_bullets  | yes                     | Bullets using only matched lines, with citations                                              |
 
 **Template fallback.** If Ollama is unreachable or a model errors, the journal falls back to a deterministic digest (captures grouped by origin), and drafts fall back to a fixed template filled from the facts. The app always produces something, and the fallback is the baseline for the model comparison.
 
@@ -547,11 +547,11 @@ Where `feedback` is empty on the first attempt and lists the exact violations on
 
 ## 9. Local model setup
 
-| Laptop RAM | Suggested text model (4-bit) | Approx. memory | Notes |
-|---|---|---|---|
-| 4 GB | Llama 3.2 1B or Gemma 3 1B | ~1 GB | Fine for journal digests; drafts will be weaker, so lean on the template fallback |
-| 8 GB | Qwen2.5 3B, Llama 3.2 3B or Gemma 3 4B | ~2-3.5 GB | Best default |
-| 16 GB | A 7B/8B model | ~5 GB | For the comparison section, and likely the best voice match |
+| Laptop RAM | Suggested text model (4-bit)           | Approx. memory | Notes                                                                             |
+| ---------- | -------------------------------------- | -------------- | --------------------------------------------------------------------------------- |
+| 4 GB       | Llama 3.2 1B or Gemma 3 1B             | ~1 GB          | Fine for journal digests; drafts will be weaker, so lean on the template fallback |
+| 8 GB       | Qwen2.5 3B, Llama 3.2 3B or Gemma 3 4B | ~2-3.5 GB      | Best default                                                                      |
+| 16 GB      | A 7B/8B model                          | ~5 GB          | For the comparison section, and likely the best voice match                       |
 
 The embedding model (`nomic-embed-text`) is small enough to run alongside any of these. Newer small models may beat these picks; the size tiers still apply.
 
@@ -570,18 +570,18 @@ Rules of thumb: modest `num_ctx` (journal prompts trim captures to fit), tempera
 
 Use your own real data from two weeks of use, plus planted-error fixtures.
 
-| Metric | How |
-|---|---|
-| Unsupported-line rate | Journal lines that fail the citation check on first attempt, per model, and how many the retry fixes |
-| Fact-check catch rate | Take 30 drafts, plant one wrong date, link or number in each, and count how many `check_facts` catches. Also record false alarms |
-| Voice match | Blind test: mix 10 of your real posts with 10 generated ones and ask 5 people to pick the generated ones. Report the guess rate |
-| Platform-rule pass rate | Drafts passing length, hashtag and banned-phrase checks on the first attempt vs after retries |
-| Edit distance | How much you change each draft before publishing (characters changed over characters). Falling over time means the voice is improving |
-| Time to post | Minutes from "I should post" to published, with the tool vs your usual way |
-| Posting consistency | Posts per week per workspace in the 2 weeks before vs the 2 weeks after you start using it. This is your headline result |
-| Capture coverage | Share of your week's real work that ended up in the desk (self-estimate) |
-| Job-tailoring grounding | Share of resume bullets whose citations survive verification |
-| Speed and RAM | Seconds per journal entry and per draft, peak RAM via `psutil` |
+| Metric                  | How                                                                                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Unsupported-line rate   | Journal lines that fail the citation check on first attempt, per model, and how many the retry fixes                                  |
+| Fact-check catch rate   | Take 30 drafts, plant one wrong date, link or number in each, and count how many `check_facts` catches. Also record false alarms      |
+| Voice match             | Blind test: mix 10 of your real posts with 10 generated ones and ask 5 people to pick the generated ones. Report the guess rate       |
+| Platform-rule pass rate | Drafts passing length, hashtag and banned-phrase checks on the first attempt vs after retries                                         |
+| Edit distance           | How much you change each draft before publishing (characters changed over characters). Falling over time means the voice is improving |
+| Time to post            | Minutes from "I should post" to published, with the tool vs your usual way                                                            |
+| Posting consistency     | Posts per week per workspace in the 2 weeks before vs the 2 weeks after you start using it. This is your headline result              |
+| Capture coverage        | Share of your week's real work that ended up in the desk (self-estimate)                                                              |
+| Job-tailoring grounding | Share of resume bullets whose citations survive verification                                                                          |
+| Speed and RAM           | Seconds per journal entry and per draft, peak RAM via `psutil`                                                                        |
 
 Compare the same fixtures across a 1B, 3B and (if your RAM allows) 7B model, plus the template fallback as baseline. Save to `eval/results.csv` and put one table in the post. Keep a list of every invented fact the checkers caught; it makes a good "what went wrong" section.
 
@@ -597,17 +597,19 @@ Put this plan at `docs/PLAN.md` and add an `AGENTS.md` at the repo root. opencod
 Source of truth: docs/PLAN.md. Build one milestone per session, on its own branch.
 
 ## Rules
+
 - All verifiers (src/cdesk/verify.py, planner.py) are deterministic and need unit tests first,
   including planted-error cases. Do not change a threshold or regex without updating its tests.
 - No network calls except to local Ollama. No telemetry. No cloud SDKs.
 - Every LLM call uses structured output (pydantic schema) and has a template fallback.
-- Prompts live in src/cdesk/prompts/*.txt, never inline.
+- Prompts live in src/cdesk/prompts/\*.txt, never inline.
 - Never commit anything under data/. Never print capture bodies in logs.
 - Schema changes go through db.py migrations; ask before changing a table.
 - Run pytest before every commit. Small commits. Close issues with "Closes #n".
 ```
 
 Workflow tips:
+
 - Start each session with: "Implement milestone M2 from docs/PLAN.md. Acceptance criteria are in the table. Write tests first for verify.py."
 - Review every diff that touches `verify.py`. The checkers are the product's credibility, and a coding agent can quietly loosen them to make a test pass.
 - After each milestone, run the app on your real captures before moving on.
@@ -630,16 +632,16 @@ You are user #1, and the quickest honest result is your own posting consistency 
 
 Time estimates assume opencode writes most of the code, and include your review, testing and fixes (~26 hours). Add your own due dates to each milestone.
 
-| Milestone | Goal | Est. | Done when |
-|---|---|---|---|
-| M0 Setup and data model | Repo, env, schema, config, stubbed graphs, CLI skeleton | 2 h | `desk --help` works; schema creates; graphs run end to end with stubs |
-| M1 Capture | Paste, files, git, chat-export parser, dedupe, search | 3 h | A week of your real work is in the inbox, tagged by origin, and searchable |
-| M2 Journal graph | Summarize, verify, retry, store, fallback | 3 h | A day's captures become a cited journal; an invented number is caught in a planted test |
-| M3 Workspaces and voice | Workspaces, voice corpus, embeddings, rules config | 3 h | Past posts imported per workspace; top-3 voice examples retrieved |
-| M4 Draft graph | Gather, write, fact check, rules check, retry, repurpose | 4 h | A journal entry becomes drafts for LinkedIn and your society; a planted wrong date is caught and retried |
-| M5 Planner and nudges | Calendar view, reminders, nudges, `.ics` export, weekly review | 3 h | Overdue-workspace nudge appears; `.ics` opens in Google Calendar |
-| M6 Organizers | Ideas (status, scores, duplicates), job tracker, tailoring graph, context packs | 4 h | Duplicate ideas flagged; a job description produces cited resume bullets; a context pack pastes cleanly into a chat |
-| M7 Eval, dogfood, write-up | Comparison table, two weeks of real use, post | 4 h | `eval/results.csv` filled; before/after posting numbers captured; post drafted and submitted |
+| Milestone                  | Goal                                                                            | Est. | Done when                                                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------- |
+| M0 Setup and data model    | Repo, env, schema, config, stubbed graphs, CLI skeleton                         | 2 h  | `desk --help` works; schema creates; graphs run end to end with stubs                                               |
+| M1 Capture                 | Paste, files, git, chat-export parser, dedupe, search                           | 3 h  | A week of your real work is in the inbox, tagged by origin, and searchable                                          |
+| M2 Journal graph           | Summarize, verify, retry, store, fallback                                       | 3 h  | A day's captures become a cited journal; an invented number is caught in a planted test                             |
+| M3 Workspaces and voice    | Workspaces, voice corpus, embeddings, rules config                              | 3 h  | Past posts imported per workspace; top-3 voice examples retrieved                                                   |
+| M4 Draft graph             | Gather, write, fact check, rules check, retry, repurpose                        | 4 h  | A journal entry becomes drafts for LinkedIn and your society; a planted wrong date is caught and retried            |
+| M5 Planner and nudges      | Calendar view, reminders, nudges, `.ics` export, weekly review                  | 3 h  | Overdue-workspace nudge appears; `.ics` opens in Google Calendar                                                    |
+| M6 Organizers              | Ideas (status, scores, duplicates), job tracker, tailoring graph, context packs | 4 h  | Duplicate ideas flagged; a job description produces cited resume bullets; a context pack pastes cleanly into a chat |
+| M7 Eval, dogfood, write-up | Comparison table, two weeks of real use, post                                   | 4 h  | `eval/results.csv` filled; before/after posting numbers captured; post drafted and submitted                        |
 
 **Dogfood early.** Start using it for real after M2 and keep a log. Start the 2-week consistency measurement as soon as M4 works, not at the end.
 
@@ -648,6 +650,7 @@ Time estimates assume opencode writes most of the code, and include your review,
 ### Issues by milestone
 
 **M0 Setup and data model**
+
 - [ ] Create repo, `pyproject.toml`, `.gitignore` (ignore `data/`), MIT license, `AGENTS.md`, `docs/PLAN.md`
 - [ ] Schema and migrations in `db.py`
 - [ ] `config.py` with models and platform rules
@@ -655,6 +658,7 @@ Time estimates assume opencode writes most of the code, and include your review,
 - [ ] Install Ollama, pull a text model and the embedding model, confirm structured output and `embed` work
 
 **M1 Capture**
+
 - [ ] Paste and quick-add capture with content-hash dedupe
 - [ ] File drop (markdown, text) and optional drop-folder watcher
 - [ ] Chat-export parser: check each tool's export format; paste fallback
@@ -663,6 +667,7 @@ Time estimates assume opencode writes most of the code, and include your review,
 - [ ] Origin tagging (which AI account or tool)
 
 **M2 Journal graph**
+
 - [ ] `select` and `summarize` with structured output
 - [ ] `unsupported_reasons` with unit tests (missing cite, unknown id, invented number, invented URL)
 - [ ] Verify node and retry with feedback; drop and warn on lines that stay unsupported
@@ -671,6 +676,7 @@ Time estimates assume opencode writes most of the code, and include your review,
 - [ ] Weekly entry generation
 
 **M3 Workspaces and voice**
+
 - [ ] Workspace CRUD with rules, cadence and audience
 - [ ] Import past posts per workspace (paste or file)
 - [ ] Embeddings stored as BLOB; `top_k` tested
@@ -678,6 +684,7 @@ Time estimates assume opencode writes most of the code, and include your review,
 - [ ] Banned-phrase list editor
 
 **M4 Draft graph**
+
 - [ ] `gather` from journal lines, a post, an idea, or a brief
 - [ ] `write` with the draft prompt and structured retry feedback
 - [ ] `extract_facts` and `check_facts` with unit tests (dates, times, URLs, handles, numbers)
@@ -688,6 +695,7 @@ Time estimates assume opencode writes most of the code, and include your review,
 - [ ] Drafts page with warnings in red
 
 **M5 Planner and nudges**
+
 - [ ] Post scheduling and status changes
 - [ ] `due_nudges` with tests (never posted, on time, overdue)
 - [ ] Reminders table and weekly review page
@@ -696,6 +704,7 @@ Time estimates assume opencode writes most of the code, and include your review,
 - [ ] Nudge text template and optional "drafts ready" suggestion
 
 **M6 Organizers**
+
 - [ ] Idea cards with status, effort, impact, next step, links to captures
 - [ ] Duplicate-idea detection with a tunable threshold
 - [ ] Job kanban with deadlines and follow-up reminders
@@ -704,6 +713,7 @@ Time estimates assume opencode writes most of the code, and include your review,
 - [ ] Context pack generator and a CLI command
 
 **M7 Eval, dogfood, write-up**
+
 - [ ] `eval/run_eval.py`, fixtures with planted errors, `models.yaml`
 - [ ] Run 1B, 3B and 7B (if RAM) plus template baseline
 - [ ] Blind voice test with 5 people
@@ -813,6 +823,7 @@ Suggested branch and commit style: one branch per milestone (`m4-draft-graph`), 
 ## 14. Writing the post
 
 **Outline**
+
 1. **Open with the mess.** Four AI accounts, scattered notes, a Substack that has not been updated in weeks. One real example of work that never became a post.
 2. **The problem in one paragraph.** Work is scattered across tools, so posting depends on memory and mood. Existing caption tools start from a blank box.
 3. **Why open matters here.** The journal and job applications are private. You are not locked into any one AI account. The voice is tuned on your own posts at no per-token cost. Models are swappable, and you show the 1B, 3B and 7B drafts side by side.
@@ -823,21 +834,22 @@ Suggested branch and commit style: one branch per milestone (`m4-draft-graph`), 
 8. **Close with the habit.** Posts per week before and after, and what the journal now lets you say that you used to forget.
 
 **Style reminders**
+
 - Concrete over abstract: a real capture, the line the model wrote, the check that caught it.
 - Show one real nudge, one draft with its red warnings, and one `.ics` event on the calendar.
 - Keep the technical section short; the story is the habit it built.
 
 ## 15. Risks and mitigations
 
-| Risk | Mitigation |
-|---|---|
-| Chat-export formats differ or change | Paste and file drop always work; write one parser at a time and test with real exports |
-| Small model invents facts | Citations on every journal line, fact-check on every draft, retry with exact feedback, human approval before anything is marked approved |
-| Drafts sound generic | Retrieve closest past posts as examples, grow the banned-phrase list from your edits, track edit distance, consider a small fine-tune later |
-| Platform limits change | Keep limits in `config.py`, verify before shipping, note the date checked |
-| Too many features, thin quality | Build and dogfood in milestone order, and defer job tailoring and duplicate detection first |
-| Coding agent loosens the verifiers | Tests first, review every diff touching `verify.py`, rules in `AGENTS.md` |
-| Sensitive data (journal, job applications) | Local SQLite only, `data/` gitignored, no telemetry, back up by copying one file |
-| Students will not pay | Measure it honestly; report usage and willingness, and note the paid angles you would try next |
-| Embedding-based matches are noisy | Tune thresholds on your own data, show matches for confirmation instead of acting on them automatically |
-| Run out of time | Use the cut line in section 13 |
+| Risk                                       | Mitigation                                                                                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chat-export formats differ or change       | Paste and file drop always work; write one parser at a time and test with real exports                                                      |
+| Small model invents facts                  | Citations on every journal line, fact-check on every draft, retry with exact feedback, human approval before anything is marked approved    |
+| Drafts sound generic                       | Retrieve closest past posts as examples, grow the banned-phrase list from your edits, track edit distance, consider a small fine-tune later |
+| Platform limits change                     | Keep limits in `config.py`, verify before shipping, note the date checked                                                                   |
+| Too many features, thin quality            | Build and dogfood in milestone order, and defer job tailoring and duplicate detection first                                                 |
+| Coding agent loosens the verifiers         | Tests first, review every diff touching `verify.py`, rules in `AGENTS.md`                                                                   |
+| Sensitive data (journal, job applications) | Local SQLite only, `data/` gitignored, no telemetry, back up by copying one file                                                            |
+| Students will not pay                      | Measure it honestly; report usage and willingness, and note the paid angles you would try next                                              |
+| Embedding-based matches are noisy          | Tune thresholds on your own data, show matches for confirmation instead of acting on them automatically                                     |
+| Run out of time                            | Use the cut line in section 13                                                                                                              |
