@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .config import DB_PATH, ensure_dirs
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 INIT_SCHEMA = """
 CREATE TABLE IF NOT EXISTS workspace (
@@ -111,10 +111,24 @@ CREATE TABLE IF NOT EXISTS reminder (
 );
 """
 
-# Each migration runs after the previous SCHEMA_VERSION is applied.
+# Each migration runs after the previous version is applied.
 # Append new entries; never edit ones already released.
 MIGRATIONS: dict[int, str] = {
-    # 2: "ALTER TABLE capture ADD COLUMN starred INTEGER DEFAULT 0;",
+    # v2: keep FTS in sync automatically; capture bodies are never logged.
+    2: """
+    CREATE TRIGGER IF NOT EXISTS capture_fts_insert AFTER INSERT ON capture BEGIN
+      INSERT INTO capture_fts(rowid, title, body)
+      VALUES (new.id, coalesce(new.title, ''), new.body);
+    END;
+    CREATE TRIGGER IF NOT EXISTS capture_fts_delete AFTER DELETE ON capture BEGIN
+      DELETE FROM capture_fts WHERE rowid = old.id;
+    END;
+    CREATE TRIGGER IF NOT EXISTS capture_fts_update AFTER UPDATE OF title, body ON capture BEGIN
+      DELETE FROM capture_fts WHERE rowid = old.id;
+      INSERT INTO capture_fts(rowid, title, body)
+      VALUES (new.id, coalesce(new.title, ''), new.body);
+    END;
+    """,
 }
 
 
@@ -138,8 +152,8 @@ def migrate(conn: sqlite3.Connection) -> None:
     version = current_version(conn)
     if version < 1:
         conn.executescript(INIT_SCHEMA)
-        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-        version = SCHEMA_VERSION
+        conn.execute("PRAGMA user_version = 1")
+        version = 1
     for target in sorted(MIGRATIONS):
         if version < target:
             conn.executescript(MIGRATIONS[target])
@@ -160,7 +174,7 @@ def init_db(db_path: Path | str | None = None) -> sqlite3.Connection:
 # --- small helpers used across modules -------------------------------------
 
 def insert_capture(conn: sqlite3.Connection, cap: dict) -> int | None:
-    """Insert a capture; keep FTS in sync. Returns id, or None if duplicate hash."""
+    """Insert a capture (FTS is synced by trigger). Returns id, or None if duplicate hash."""
     try:
         cur = conn.execute(
             """INSERT INTO capture
@@ -181,22 +195,35 @@ def insert_capture(conn: sqlite3.Connection, cap: dict) -> int | None:
     except sqlite3.IntegrityError:
         conn.rollback()
         return None
-    rowid = cur.lastrowid
-    conn.execute(
-        "INSERT INTO capture_fts(rowid, title, body) VALUES (?, ?, ?)",
-        (rowid, cap.get("title") or "", cap["body"]),
-    )
     conn.commit()
-    return rowid
+    return cur.lastrowid
 
 
-def search_captures(conn: sqlite3.Connection, query: str) -> list[sqlite3.Row]:
-    """FTS search over captures (M1 wires this into the CLI/UI properly)."""
+def search_captures(conn: sqlite3.Connection, query: str, limit: int = 20) -> list[sqlite3.Row]:
+    """FTS search over captures, best match first."""
     rows = conn.execute(
         """SELECT c.* FROM capture c
            JOIN capture_fts f ON f.rowid = c.id
            WHERE capture_fts MATCH ?
-           ORDER BY rank""",
-        (query,),
+           ORDER BY rank
+           LIMIT ?""",
+        (query, limit),
     ).fetchall()
     return list(rows)
+
+
+def list_captures(conn: sqlite3.Connection, limit: int = 20) -> list[sqlite3.Row]:
+    """Most recent captures first (the inbox)."""
+    rows = conn.execute(
+        "SELECT * FROM capture ORDER BY captured_at DESC, id DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    return list(rows)
+
+
+def list_origins(conn: sqlite3.Connection) -> list[str]:
+    """Distinct origins seen so far, for origin tagging and filtering."""
+    rows = conn.execute(
+        "SELECT DISTINCT origin FROM capture WHERE origin IS NOT NULL ORDER BY origin"
+    ).fetchall()
+    return [r["origin"] for r in rows]

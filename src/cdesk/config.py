@@ -1,5 +1,6 @@
 """Paths, model names and platform rules. See docs/PLAN.md section 6."""
 
+import os
 from pathlib import Path
 
 # --- paths -----------------------------------------------------------------
@@ -40,3 +41,13 @@ def ensure_dirs() -> None:
     """Create data directories on first use."""
     for d in (DATA_DIR, DROP_DIR, EXPORT_DIR):
         d.mkdir(parents=True, exist_ok=True)
+
+
+def default_origin() -> str:
+    """Where captures come from when the user does not say.
+
+    Set CDESK_ORIGIN per machine/account, e.g. "claude-acct-2", "gemini",
+    "opencode". Every capture carries an origin so the journal can tell
+    scattered work apart.
+    """
+    return os.environ.get("CDESK_ORIGIN", "unknown")
