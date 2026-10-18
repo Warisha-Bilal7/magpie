@@ -8,13 +8,14 @@ Capture bodies are never printed by the CLI (AGENTS.md: no bodies in logs);
 listings show id, date, origin and title only.
 """
 
+import json
 import sys
 from datetime import date
 
 import typer
 
 from . import __version__
-from .config import EMBED_MODEL, MODEL_NAME, PLATFORM_RULES, default_origin, ensure_dirs
+from .config import EMBED_MODEL, MODEL_NAME, default_origin, ensure_dirs
 
 # Windows consoles default to cp1252; non-ASCII output (BOMs, smart quotes
 # from imported posts) must never crash a command.
@@ -290,16 +291,87 @@ def journal(
 @app.command()
 def draft(
     brief: str = typer.Option("", "--brief", "-b", help="What the draft should say."),
-    workspace: str = typer.Option("personal", "--workspace", "-w", help="Target workspace kind."),
+    workspace: str = typer.Option(..., "--workspace", "-w", help="Target workspace name."),
+    journal_entry: int | None = typer.Option(None, "--journal-entry", help="Draft from a journal entry id."),
+    post: int | None = typer.Option(None, "--post", help="Draft from an existing post id."),
+    idea: int | None = typer.Option(None, "--idea", help="Draft from an idea card id."),
 ) -> None:
-    """Run the draft graph (stub in M0, real in M4)."""
+    """Run the draft graph: gather, write, fact-check, rules-check, save."""
     from .graphs.draft import build_draft_graph
 
-    rules = PLATFORM_RULES.get(workspace, {})
-    result = build_draft_graph().invoke(
-        {"brief": brief, "source_kind": "freeform", "rules": rules}
-    )
+    conn = _open_db()
+    try:
+        ws = _ws_or_die(conn, workspace)
+        picked = [k for k, v in [("journal", journal_entry), ("post", post), ("idea", idea)] if v is not None]
+        if len(picked) > 1:
+            typer.echo("Pick at most one of --journal-entry/--post/--idea.")
+            raise typer.Exit(code=1)
+        if picked:
+            kind, sid = picked[0], {"journal": journal_entry, "post": post, "idea": idea}[picked[0]]
+            source_kind, source_ids = kind, [sid]
+        else:
+            if not brief.strip():
+                typer.echo("Give a --brief or a source (--journal-entry/--post/--idea).")
+                raise typer.Exit(code=1)
+            source_kind, source_ids = "freeform", []
+        result = build_draft_graph().invoke({
+            "conn": conn, "workspace_id": ws["id"], "brief": brief,
+            "source_kind": source_kind, "source_ids": source_ids,
+        })
+    finally:
+        conn.close()
+    tag = " (template fallback)" if result.get("used_fallback") else ""
+    typer.echo(f"Draft #{result.get('post_id', 0)} for {workspace}{tag}")
     typer.echo(result.get("draft", "(no draft)"))
+    for w in result.get("warnings", []):
+        typer.echo(f"  warning: {w}")
+
+
+@app.command()
+def drafts(
+    workspace: str = typer.Option("", "--workspace", "-w", help="Filter by workspace name."),
+) -> None:
+    """List saved drafts with their warning counts (bodies not printed)."""
+    from .db import list_posts
+
+    conn = _open_db()
+    try:
+        ws_id = None
+        if workspace:
+            ws_id = _ws_or_die(conn, workspace)["id"]
+        rows = list_posts(conn, workspace_id=ws_id)
+    finally:
+        conn.close()
+    if not rows:
+        typer.echo("No drafts yet.")
+        return
+    for p in rows:
+        warnings = json.loads(p["warnings"]) if p["warnings"] else []
+        flag = f"  {len(warnings)} warning(s)" if warnings else ""
+        typer.echo(f"#{p['id']} [{p['status']}] ws#{p['workspace_id']}{flag}")
+
+
+@app.command()
+def repurpose(
+    post_id: int = typer.Argument(..., help="Post id to repurpose."),
+    workspace: str = typer.Option(..., "--workspace", "-w", help="Target workspace name."),
+) -> None:
+    """Re-draft an existing post into another workspace's voice and rules."""
+    from .graphs.draft import repurpose_post
+
+    conn = _open_db()
+    try:
+        ws = _ws_or_die(conn, workspace)
+        result = repurpose_post(conn, post_id, ws["id"])
+    except ValueError as e:
+        typer.echo(str(e))
+        raise typer.Exit(code=1)
+    finally:
+        conn.close()
+    typer.echo(f"Repurposed post #{post_id} -> draft #{result.get('post_id', 0)} for {workspace}")
+    typer.echo(result.get("draft", "(no draft)"))
+    for w in result.get("warnings", []):
+        typer.echo(f"  warning: {w}")
 
 
 @app.command()

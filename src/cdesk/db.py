@@ -299,3 +299,63 @@ def daily_lines_between(conn: sqlite3.Connection, start: str, end: str) -> list[
          "capture_ids": json.loads(r["capture_ids"]), "day": r["day"]}
         for r in rows
     ]
+
+
+# --- posts (M4) -------------------------------------------------------------
+
+def store_post(
+    conn: sqlite3.Connection,
+    workspace_id: int,
+    body_md: str,
+    *,
+    title: str | None = None,
+    status: str = "draft",
+    source_ids=None,
+    parent_post_id: int | None = None,
+    warnings: list[str] | None = None,
+) -> int:
+    """Persist a draft/post. source_ids is stored as JSON; warnings too."""
+    cur = conn.execute(
+        "INSERT INTO post (workspace_id, title, body_md, status, source_ids, "
+        "parent_post_id, warnings) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (
+            workspace_id,
+            title,
+            body_md,
+            status,
+            json.dumps(source_ids) if source_ids is not None else None,
+            parent_post_id,
+            json.dumps(warnings) if warnings is not None else None,
+        ),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def get_post(conn: sqlite3.Connection, post_id: int) -> dict | None:
+    row = conn.execute("SELECT * FROM post WHERE id = ?", (post_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def list_posts(
+    conn: sqlite3.Connection,
+    workspace_id: int | None = None,
+    status: str | None = None,
+) -> list[dict]:
+    q, params = "SELECT * FROM post", []
+    clauses = []
+    if workspace_id is not None:
+        clauses.append("workspace_id = ?")
+        params.append(workspace_id)
+    if status is not None:
+        clauses.append("status = ?")
+        params.append(status)
+    if clauses:
+        q += " WHERE " + " AND ".join(clauses)
+    rows = conn.execute(q + " ORDER BY id DESC", params).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_idea(conn: sqlite3.Connection, idea_id: int) -> dict | None:
+    row = conn.execute("SELECT * FROM idea WHERE id = ?", (idea_id,)).fetchone()
+    return dict(row) if row else None

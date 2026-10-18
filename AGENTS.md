@@ -31,12 +31,21 @@ Source of truth: docs/PLAN.md. Build one milestone per session, on its own branc
 - Deterministic fallback digest (daily per-capture, weekly per-day)
 - CLI `cdesk journal --day/--weekly` wired to the DB; Journal Streamlit page
 
-## Current milestone: M3 Workspaces and voice
-- [x] Workspace CRUD with rules and cadence (cdesk.workspaces, #18)
-- [x] Import past posts per workspace; text/JSON parsers, BOM tolerated (#19)
-- [x] Embeddings as BLOB + top_k tests (cdesk.voice, injectable embedder, #20)
-- [x] Voice examples on Workspaces Streamlit page + `cdesk workspace voice` (#21)
-- [x] Banned-phrase editor (page + `cdesk workspace ban/unban`, #22)
+### M3 Workspaces and voice
+- Workspace CRUD with rules and cadence (cdesk.workspaces, #18)
+- Import past posts per workspace; text/JSON parsers, BOM tolerated (#19)
+- Embeddings as BLOB + top_k tests (cdesk.voice, injectable embedder, #20)
+- Voice examples on Workspaces Streamlit page + `cdesk workspace voice` (#21)
+- Banned-phrase editor (page + `cdesk workspace ban/unban`, #22)
+
+## Current milestone: M4 Draft graph
+- [x] extract_facts / check_facts / check_rules planted-error tests (#25, #26)
+- [x] gather from journal lines, post, idea or brief (#23)
+- [x] write with prompts/draft.txt + exact violation feedback (#24)
+- [x] Router, MAX_ATTEMPTS, save with leftover warnings (#27)
+- [x] Template fallback, works with Ollama off (#28)
+- [x] Repurpose across workspaces (`repurpose_post`, `cdesk repurpose`, #29)
+- [x] Drafts Streamlit page with warnings in red (#30)
 
 ## Notes for later milestones
 - Schema is at v2 (FTS sync triggers). Bump MIGRATIONS in db.py for any table change;
