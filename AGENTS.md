@@ -19,13 +19,19 @@ Source of truth: docs/PLAN.md. Build one milestone per session, on its own branc
   coding agent can quietly loosen them to make a test pass.
 - After each milestone, run the app on real captures before moving on.
 
-## Current milestone: M1 Capture
-- [x] Paste and quick-add capture with content-hash dedupe
-- [x] File drop and drop-folder watcher
-- [x] Chat-export parser (ChatGPT JSON, generic messages, markdown transcripts; paste fallback)
-- [x] Git capture per repo per day
-- [x] FTS search over captures (triggers keep the index in sync)
-- [x] Origin tagging (--origin flag, CDESK_ORIGIN env, default "unknown")
+## Completed milestones
+### M1 Capture
+- Paste/quick-add with content-hash dedupe; file drop + drop-folder watcher
+- Chat-export parser (ChatGPT JSON, generic messages, markdown; paste fallback)
+- Git capture per repo per day; FTS search (trigger-synced); origin tagging
+
+## Current milestone: M2 Journal graph
+- [x] unsupported_reasons with planted-error unit tests (verify.py)
+- [x] select and summarize nodes with structured output
+- [x] Verify node, retry with exact feedback, drop-and-warn at MAX_ATTEMPTS
+- [x] Deterministic fallback digest (daily per-capture, weekly per-day)
+- [x] CLI `cdesk journal --day/--weekly` wired to the DB
+- [x] Journal Streamlit page with per-line source expansion
 
 ## Notes for later milestones
 - Schema is at v2 (FTS sync triggers). Bump MIGRATIONS in db.py for any table change;
@@ -33,3 +39,8 @@ Source of truth: docs/PLAN.md. Build one milestone per session, on its own branc
 - Git `--since` bare dates are end-of-day approxidate in git >= 2.5x; pass full timestamps.
 - The CLI is `cdesk`, not `desk` (Windows desk.cpl collision).
 - CLI never prints capture bodies (AGENTS.md rule); listings are id/date/origin/title only.
+- Prompt files contain JSON braces: use str.replace("{captures}", ...), not str.format().
+- The weekly prompt must list allowed capture ids explicitly, or small models invent ids
+  (the verifier drops them all — do not loosen the check to compensate).
+- Fallback digest line text must never add ids/dates the source lacks; the verifier
+  will (rightly) drop them.
