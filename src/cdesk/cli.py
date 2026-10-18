@@ -16,6 +16,11 @@ import typer
 from . import __version__
 from .config import EMBED_MODEL, MODEL_NAME, PLATFORM_RULES, default_origin, ensure_dirs
 
+# Windows consoles default to cp1252; non-ASCII output (BOMs, smart quotes
+# from imported posts) must never crash a command.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 app = typer.Typer(help="Content Desk — local-first work journal and posting desk.", no_args_is_help=True)
 ws_app = typer.Typer(help="Workspaces: channels, rules and the past-post voice corpus.", no_args_is_help=True)
 app.add_typer(ws_app, name="workspace")

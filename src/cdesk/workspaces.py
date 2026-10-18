@@ -167,24 +167,25 @@ def index_workspace_embeddings(
 
 
 def parse_posts_text(text: str) -> list[dict]:
-    """Past posts separated by a line containing only ---."""
+    """Past posts separated by a line containing only --- (BOM tolerated)."""
+    text = text.lstrip("\ufeff")
     chunks = []
     buf: list[str] = []
     for line in text.splitlines():
         if line.strip() == "---":
             if buf and "".join(buf).strip():
-                chunks.append({"body": "\n".join(buf).strip()})
+                chunks.append({"body": "\n".join(buf).strip().lstrip("\ufeff")})
             buf = []
         else:
             buf.append(line)
     if buf and "".join(buf).strip():
-        chunks.append({"body": "\n".join(buf).strip()})
+        chunks.append({"body": "\n".join(buf).strip().lstrip("\ufeff")})
     return chunks
 
 
 def parse_posts_json(text: str) -> list[dict]:
-    """A JSON list of {body, url?, published_at?}."""
-    data = json.loads(text)
+    """A JSON list of {body, url?, published_at?} (BOM tolerated)."""
+    data = json.loads(text.lstrip("\ufeff"))
     if not isinstance(data, list):
         raise ValueError("expected a JSON list of posts")
     out = []

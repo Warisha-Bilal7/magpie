@@ -125,3 +125,9 @@ def test_import_posts_json(conn):
     posts = parse_posts_json(json.dumps(data))
     assert posts[0]["url"] == "u1"
     assert posts[1]["body"] == "b"
+
+
+def test_parse_posts_text_tolerates_utf8_bom():
+    from cdesk.workspaces import parse_posts_text
+    posts = parse_posts_text("\ufeffFirst post\n---\nSecond post")
+    assert [p["body"] for p in posts] == ["First post", "Second post"]
