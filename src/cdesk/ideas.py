@@ -51,9 +51,6 @@ def duplicates_for(
         other = emb if isinstance(emb, np.ndarray) else blob_to_vec(emb)
         score = _cosine(np.asarray(vec, dtype="float32"),
                         np.asarray(other, dtype="float32"))
-        if score >= threshold and abs(score - 1.0) < 1e-6:
-            # skip exact self-match for near-duplicate detection
-            continue
         if score >= threshold:
             out.append({"id": r["id"], "title": r["title"], "score": score})
     return sorted(out, key=lambda m: -m["score"])
@@ -72,9 +69,9 @@ def find_duplicates(
 
     embedder = embedder or embed_texts
     rows = conn.execute(
-        "SELECT id, title, embedding FROM idea WHERE embedding IS NOT NULL"
+        "SELECT id, title, embedding FROM idea"
     ).fetchall()
-    rows = [dict(r) for r in rows if r["id"] != exclude_id]
+    rows = [dict(r) for r in rows if r["id"] != exclude_id and r["embedding"] is not None]
     if not rows:
         return []
     vec = np.asarray(embedder([_text(title, note)])[0], dtype="float32")

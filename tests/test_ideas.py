@@ -120,8 +120,12 @@ def test_duplicates_for_skips_unembedded_rows():
 
 
 def test_find_duplicates_end_to_end_with_fake_embedder(conn):
+    v = {
+        "idea one\nnote one": [1.0, 0.0, 0.0],
+        "idea two\n": [0.0, 1.0, 0.0],
+        "idea one again\nnote one": [0.98, 0.199, 0.0],
+    }
     embedder = FakeEmbedder(v)
-    a = create_idea(conn, "idea one", note="note one")
     a = create_idea(conn, "idea one", note="note one")
     create_idea(conn, "idea two")
     index_idea(conn, a["id"], embedder=embedder)
