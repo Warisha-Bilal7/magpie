@@ -402,12 +402,12 @@ def ws_ban(
     workspace: str = typer.Option(..., "-w", "--workspace"),
 ) -> None:
     """Add a banned phrase to a workspace's rules (style lint)."""
-    from .workspaces import add_banned_phrase, effective_rules
+    from .workspaces import add_banned_phrase, effective_rules, get_workspace
     conn = _open_db()
     try:
         ws = _ws_or_die(conn, workspace)
         add_banned_phrase(conn, ws["id"], phrase)
-        rules = effective_rules(ws)
+        rules = effective_rules(get_workspace(conn, ws["id"]))
         typer.echo(f"Banned phrases for {ws['name']}: {rules['banned']}")
     finally:
         conn.close()
@@ -419,12 +419,12 @@ def ws_unban(
     workspace: str = typer.Option(..., "-w", "--workspace"),
 ) -> None:
     """Remove a banned phrase from a workspace's rules."""
-    from .workspaces import effective_rules, remove_banned_phrase
+    from .workspaces import effective_rules, get_workspace, remove_banned_phrase
     conn = _open_db()
     try:
         ws = _ws_or_die(conn, workspace)
         remove_banned_phrase(conn, ws["id"], phrase)
-        rules = effective_rules(ws)
+        rules = effective_rules(get_workspace(conn, ws["id"]))
         typer.echo(f"Banned phrases for {ws['name']}: {rules['banned']}")
     finally:
         conn.close()
