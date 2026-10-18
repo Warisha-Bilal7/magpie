@@ -4,6 +4,7 @@ Schema changes MUST go through migrations: bump SCHEMA_VERSION, append SQL to
 MIGRATIONS, and never edit an old migration in place.
 """
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -227,3 +228,74 @@ def list_origins(conn: sqlite3.Connection) -> list[str]:
         "SELECT DISTINCT origin FROM capture WHERE origin IS NOT NULL ORDER BY origin"
     ).fetchall()
     return [r["origin"] for r in rows]
+
+
+# --- journal helpers (M2) --------------------------------------------------
+
+def captures_for_day(conn: sqlite3.Connection, day: str) -> list[dict]:
+    """Captures whose work happened on the given yyyy-mm-dd."""
+    rows = conn.execute(
+        "SELECT * FROM capture WHERE happened_at LIKE ? ORDER BY id",
+        (f"{day}%",),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def captures_by_ids(conn: sqlite3.Connection, ids) -> dict[int, dict]:
+    ids = sorted({int(i) for i in ids})
+    if not ids:
+        return {}
+    q = ",".join("?" * len(ids))
+    rows = conn.execute(f"SELECT * FROM capture WHERE id IN ({q})", ids).fetchall()
+    return {r["id"]: dict(r) for r in rows}
+
+
+def store_journal_entry(
+    conn: sqlite3.Connection, day: str, kind: str, lines: list[dict]
+) -> int:
+    """Persist a journal entry and its cited lines. Returns entry id."""
+    cur = conn.execute(
+        "INSERT INTO journal_entry (day, kind) VALUES (?, ?)", (day, kind)
+    )
+    entry_id = cur.lastrowid
+    for ln in lines:
+        conn.execute(
+            "INSERT INTO journal_line (entry_id, text, capture_ids) VALUES (?, ?, ?)",
+            (entry_id, ln["text"], json.dumps(ln.get("cites", []))),
+        )
+    conn.commit()
+    return entry_id
+
+
+def list_journal_entries(conn: sqlite3.Connection, limit: int = 30) -> list[dict]:
+    rows = conn.execute(
+        "SELECT * FROM journal_entry ORDER BY day DESC, id DESC LIMIT ?", (limit,)
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def entry_lines(conn: sqlite3.Connection, entry_id: int) -> list[dict]:
+    rows = conn.execute(
+        "SELECT * FROM journal_line WHERE entry_id = ? ORDER BY id", (entry_id,)
+    ).fetchall()
+    return [
+        {"id": r["id"], "text": r["text"], "capture_ids": json.loads(r["capture_ids"])}
+        for r in rows
+    ]
+
+
+def daily_lines_between(conn: sqlite3.Connection, start: str, end: str) -> list[dict]:
+    """Daily journal lines in [start, end], with their entry day (for weekly digests)."""
+    rows = conn.execute(
+        """SELECT jl.id, jl.text, jl.capture_ids, je.day
+           FROM journal_line jl
+           JOIN journal_entry je ON je.id = jl.entry_id
+           WHERE je.kind = 'daily' AND je.day >= ? AND je.day <= ?
+           ORDER BY je.day, jl.id""",
+        (start, end),
+    ).fetchall()
+    return [
+        {"id": r["id"], "text": r["text"],
+         "capture_ids": json.loads(r["capture_ids"]), "day": r["day"]}
+        for r in rows
+    ]
