@@ -914,5 +914,111 @@ def job_followup(
     typer.echo(f"Reminder #{rem_id} set for {due}: {title}")
 
 
+# --- Antigravity integrations: Substack, chats, and tech trends ----------------
+
+
+@app.command("substack-sync")
+def substack_sync(
+    url_or_handle: str = typer.Argument(
+        "https://substack.com/@warishadaninbilal",
+        help="Substack profile URL, publication domain, or handle.",
+    ),
+    workspace_name: str = typer.Option("Substack", "--workspace", "-w", help="Target workspace."),
+    auto_style: bool = typer.Option(True, "--analyze-style/--no-analyze-style", help="Auto-analyze voice & cadence."),
+) -> None:
+    """Fetch published posts from Substack, import into voice corpus, and auto-tune style rules."""
+    from .capture.substack import fetch_substack_feed, import_substack_posts
+    from .style_analyzer import analyze_writing_style, apply_style_to_workspace
+    from .workspaces import create_workspace, get_workspace, list_past_posts
+
+    conn = _open_db()
+    try:
+        ws = get_workspace(conn, name=workspace_name)
+        if ws is None:
+            ws = create_workspace(conn, workspace_name, kind="substack")
+            typer.echo(f"Created new workspace '{workspace_name}'.")
+
+        typer.echo(f"Fetching posts from {url_or_handle}...")
+        posts = fetch_substack_feed(url_or_handle)
+        if not posts:
+            typer.echo("No posts found in feed.")
+            return
+
+        added_ids = import_substack_posts(conn, ws["id"], url_or_handle)
+        typer.echo(f"Ingested {len(posts)} posts ({len(added_ids)} newly imported into voice corpus).")
+
+        if auto_style:
+            all_past = list_past_posts(conn, ws["id"])
+            bodies = [p["body"] for p in all_past]
+            profile = analyze_writing_style(bodies)
+            apply_style_to_workspace(conn, ws["id"], profile)
+            typer.echo("\nAuto-tuned voice profile:")
+            typer.echo(f"  * Sentence length: {profile['avg_sentence_len']} words (std: {profile['sentence_len_std']})")
+            typer.echo(f"  * Paragraph cadence: {profile['avg_para_len']} sentences / para")
+            typer.echo(f"  * Tone: {profile['tone_notes']}")
+            typer.echo(f"  * Banned AI tropes: {len(profile['banned_ai_tropes'])} phrases explicitly banned.")
+    finally:
+        conn.close()
+
+
+@app.command("antigravity-sync")
+def antigravity_sync(
+    limit: int = typer.Option(15, "--limit", "-n", help="Max sessions to inspect."),
+) -> None:
+    """Scan Antigravity brain transcripts and import recent sessions into capture inbox."""
+    from .capture.antigravity_chats import scan_and_import_brain
+
+    conn = _open_db()
+    try:
+        results = scan_and_import_brain(conn, limit=limit)
+        if not results:
+            typer.echo("No new Antigravity sessions found.")
+            return
+        new_count = sum(1 for _, created, _ in results if created)
+        typer.echo(f"Scanned {len(results)} sessions ({new_count} newly captured into inbox).")
+        for cid, created, title in results:
+            status = "NEW" if created else "EXISTS"
+            typer.echo(f"  [{status}] #{cid or '-'} {title}")
+    finally:
+        conn.close()
+
+
+@app.command("tech-trends")
+def tech_trends(
+    limit: int = typer.Option(5, "--limit", "-n", help="Number of suggestions to generate."),
+) -> None:
+    """Scrape trending tech world news and match against your work to suggest Substack posts."""
+    from .capture.tech_news import fetch_tech_news, match_trends_with_captures
+
+    typer.echo("Fetching trending tech news...")
+    trends = fetch_tech_news()
+    if not trends:
+        typer.echo("Could not fetch trends.")
+        return
+
+    conn = _open_db()
+    try:
+        suggestions = match_trends_with_captures(conn, trends, limit=limit)
+    finally:
+        conn.close()
+
+    if not suggestions:
+        typer.echo(f"Fetched {len(trends)} trending news items, but found no keyword overlap in captures.")
+        typer.echo("Top trend sample:")
+        for t in trends[:3]:
+            typer.echo(f"  - {t['title']} ({t['url']})")
+        return
+
+    typer.echo(f"\nGenerated {len(suggestions)} receipt-backed Substack ideas:\n")
+    for idx, s in enumerate(suggestions, 1):
+        typer.echo(f"[{idx}] {s['title']}")
+        typer.echo(f"    Trending: {s['trend_title']} ({s['trend_url']})")
+        typer.echo(f"    Pitch: {s['pitch']}")
+        c_titles = [f"#{c['id']} {c['title']}" for c in s['matched_captures']]
+        typer.echo(f"    Receipts: {', '.join(c_titles)}")
+        typer.echo("")
+
+
+
 if __name__ == "__main__":
     app()
